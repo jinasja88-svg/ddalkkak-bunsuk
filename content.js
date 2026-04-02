@@ -82,6 +82,20 @@
         data
       }, '*');
     }
+
+    // 리뷰 페이지 감지
+    if (event.data.type === 'DDALKKAK_DETECT_REVIEW_PAGE') {
+      const info = detectReviewPage();
+      iframe.contentWindow.postMessage({
+        type: 'DDALKKAK_REVIEW_PAGE_INFO',
+        data: info
+      }, '*');
+    }
+
+    // 리뷰 수집 시작
+    if (event.data.type === 'DDALKKAK_COLLECT_REVIEWS') {
+      collectReviews(event.data.maxReviews || 200);
+    }
   });
 
   document.addEventListener('mousemove', (e) => {
@@ -155,6 +169,178 @@
       charCount: cleanText.length,
       url: window.location.href
     };
+  }
+
+  // ===== 리뷰 수집: 네이버 스마트스토어/브랜드스토어 =====
+
+  function detectReviewPage() {
+    const url = window.location.href;
+    const host = window.location.hostname;
+
+    // 네이버 스마트스토어 / 브랜드스토어
+    if (host.includes('smartstore.naver.com') || host.includes('brand.naver.com')) {
+      // __NEXT_DATA__에서 상품 정보 추출
+      const nextData = document.getElementById('__NEXT_DATA__');
+      if (nextData) {
+        try {
+          const data = JSON.parse(nextData.textContent);
+          const productInfo = findProductInfo(data);
+          if (productInfo) {
+            return {
+              supported: true,
+              platform: '네이버 스마트스토어',
+              productName: productInfo.name || document.title,
+              merchantNo: productInfo.merchantNo,
+              originProductNo: productInfo.originProductNo,
+              channelUid: productInfo.channelUid,
+            };
+          }
+        } catch {}
+      }
+
+      // fallback: URL에서 추출 시도
+      const productMatch = url.match(/products\/(\d+)/);
+      if (productMatch) {
+        // 페이지 소스에서 merchantNo 찾기
+        const scripts = document.querySelectorAll('script');
+        let merchantNo = '';
+        for (const s of scripts) {
+          const text = s.textContent;
+          const mMatch = text.match(/"merchantNo"\s*:\s*"?(\d+)"?/);
+          if (mMatch) { merchantNo = mMatch[1]; break; }
+        }
+        return {
+          supported: true,
+          platform: '네이버 스마트스토어',
+          productName: document.title.replace(/ : .*$/, '').trim(),
+          merchantNo,
+          originProductNo: productMatch[1],
+        };
+      }
+    }
+
+    return { supported: false };
+  }
+
+  // __NEXT_DATA__ 재귀 탐색으로 상품 정보 찾기
+  function findProductInfo(obj, depth = 0) {
+    if (depth > 10 || !obj || typeof obj !== 'object') return null;
+
+    if (obj.merchantNo && obj.originProductNo) {
+      return {
+        merchantNo: String(obj.merchantNo),
+        originProductNo: String(obj.originProductNo),
+        name: obj.name || obj.productName || '',
+        channelUid: obj.channelUid || '',
+      };
+    }
+
+    for (const key of Object.keys(obj)) {
+      const found = findProductInfo(obj[key], depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  // 네이버 리뷰 API 호출 (content script에서 — 같은 도메인이라 CORS 없음)
+  async function fetchNaverReviews(merchantNo, originProductNo, starScore, maxReviews, progressCallback) {
+    const reviews = [];
+    let page = 1;
+    const maxPages = Math.ceil(maxReviews / 20);
+
+    while (page <= maxPages) {
+      try {
+        const apiUrl = `https://${window.location.hostname}/i/v1/reviews/paged-reviews` +
+          `?page=${page}&pageSize=20&merchantNo=${merchantNo}` +
+          `&originProductNo=${originProductNo}` +
+          `&sortType=REVIEW_CREATE_DATE&starScore=${starScore}`;
+
+        const resp = await fetch(apiUrl, {
+          headers: { 'Accept': 'application/json' }
+        });
+
+        if (!resp.ok) break;
+        const data = await resp.json();
+
+        if (!data.contents || data.contents.length === 0) break;
+
+        for (const r of data.contents) {
+          const text = (r.reviewContent || '').trim();
+          if (text.length > 5) {
+            reviews.push(text);
+          }
+          if (reviews.length >= maxReviews) break;
+        }
+
+        if (progressCallback) {
+          const total = Math.min(data.totalElements || maxReviews, maxReviews);
+          progressCallback(reviews.length, total);
+        }
+
+        if (reviews.length >= maxReviews) break;
+        if (page >= (data.totalPages || 1)) break;
+        page++;
+      } catch {
+        break;
+      }
+    }
+
+    return reviews;
+  }
+
+  // 리뷰 수집 메시지 처리
+  async function collectReviews(maxReviews) {
+    const pageInfo = detectReviewPage();
+    if (!pageInfo.supported || !pageInfo.merchantNo || !pageInfo.originProductNo) {
+      iframe.contentWindow.postMessage({
+        type: 'DDALKKAK_REVIEW_RESULT',
+        success: false,
+        error: '상품 정보를 찾을 수 없습니다. 네이버 스마트스토어 상품 페이지에서 사용해주세요.'
+      }, '*');
+      return;
+    }
+
+    const sendProgress = (text, pct) => {
+      iframe.contentWindow.postMessage({
+        type: 'DDALKKAK_REVIEW_PROGRESS',
+        percent: pct,
+        text
+      }, '*');
+    };
+
+    // 1~2점 리뷰 수집 (단점)
+    sendProgress('1점 리뷰 수집 중', 5);
+    const reviews1 = await fetchNaverReviews(
+      pageInfo.merchantNo, pageInfo.originProductNo, 1, maxReviews,
+      (got, total) => sendProgress(`1점 리뷰 수집 중 (${got}개)`, 5 + (got / maxReviews) * 15)
+    );
+
+    sendProgress('2점 리뷰 수집 중', 25);
+    const reviews2 = await fetchNaverReviews(
+      pageInfo.merchantNo, pageInfo.originProductNo, 2, maxReviews - reviews1.length,
+      (got, total) => sendProgress(`2점 리뷰 수집 중 (${got}개)`, 25 + (got / maxReviews) * 15)
+    );
+
+    const negativeReviews = [...reviews1, ...reviews2].slice(0, maxReviews);
+
+    // 5점 리뷰 수집 (장점)
+    sendProgress('5점 리뷰 수집 중', 45);
+    const reviews5 = await fetchNaverReviews(
+      pageInfo.merchantNo, pageInfo.originProductNo, 5, maxReviews,
+      (got, total) => sendProgress(`5점 리뷰 수집 중 (${got}개)`, 45 + (got / maxReviews) * 20)
+    );
+
+    const positiveReviews = reviews5.slice(0, maxReviews);
+
+    sendProgress('AI 분석 요청 중', 70);
+
+    iframe.contentWindow.postMessage({
+      type: 'DDALKKAK_REVIEW_RESULT',
+      success: true,
+      positiveReviews,
+      negativeReviews,
+      productName: pageInfo.productName
+    }, '*');
   }
 
   // ===== 헤더 드래그 이벤트 연결 (iframe 내부 → 외부) =====

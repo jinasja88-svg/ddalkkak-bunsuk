@@ -32,6 +32,34 @@
     }
     .close-btn:hover { color: #fff; }
 
+    /* 탭 네비게이션 */
+    .tab-nav {
+      display: flex;
+      border-bottom: 2px solid #2a2a4a;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 8px;
+      border: none;
+      background: transparent;
+      color: #6666aa;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      color: #a5b4fc;
+      border-bottom-color: #667eea;
+      background: rgba(102,126,234,0.1);
+    }
+    .tab-btn:hover { color: #a5b4fc; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
     .controls {
       padding: 10px 12px;
       display: flex;
@@ -55,6 +83,12 @@
     }
     .btn-primary:hover { opacity: 0.9; }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-review {
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      color: #fff;
+    }
+    .btn-review:hover { opacity: 0.9; }
+    .btn-review:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .btn-secondary {
       background: #2a2a4a;
@@ -147,6 +181,35 @@
       50% { content: '..'; }
       75% { content: '...'; }
     }
+
+    /* 프로그레스 바 */
+    .progress-bar {
+      margin: 8px 12px;
+      height: 6px;
+      background: #2a2a4a;
+      border-radius: 3px;
+      overflow: hidden;
+      display: none;
+    }
+    .progress-bar.show { display: block; }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      border-radius: 3px;
+      transition: width 0.3s;
+      width: 0%;
+    }
+
+    /* 리뷰 안내 */
+    .review-info {
+      padding: 8px 12px;
+      font-size: 11px;
+      color: #8888aa;
+      border-bottom: 1px solid #2a2a4a;
+      line-height: 1.5;
+    }
+    .review-info .supported { color: #4ade80; }
+    .review-info .unsupported { color: #f87171; }
   </style>
 </head>
 <body>
@@ -158,24 +221,48 @@
     <button class="close-btn" id="closeBtn">✕</button>
   </div>
 
-  <div class="mode-toggle">
-    <button class="mode-btn" data-mode="off">기본 (DOM만)</button>
-    <button class="mode-btn active" data-mode="turbo">터보 (검색+)</button>
+  <!-- 탭 네비게이션 -->
+  <div class="tab-nav">
+    <button class="tab-btn active" data-tab="analyze">상품 분석</button>
+    <button class="tab-btn" data-tab="review">리뷰 분석기</button>
   </div>
 
-  <div class="custom-prompt">
-    <textarea id="userPrompt" placeholder="분석 요청을 입력하세요 (비우면 기본 분석)">이 사이트의 제품을 아주 상세하게 강점, 단점, 스펙 등 분석해서 알려줘</textarea>
+  <!-- 탭 1: 상품 분석 (기존) -->
+  <div class="tab-content active" id="tab-analyze">
+    <div class="mode-toggle">
+      <button class="mode-btn" data-mode="off">기본 (DOM만)</button>
+      <button class="mode-btn active" data-mode="turbo">터보 (검색+)</button>
+    </div>
+    <div class="custom-prompt">
+      <textarea id="userPrompt" placeholder="분석 요청을 입력하세요 (비우면 기본 분석)">이 사이트의 제품을 아주 상세하게 강점, 단점, 스펙 등 분석해서 알려줘</textarea>
+    </div>
+    <div class="controls">
+      <button class="btn btn-primary" id="analyzeBtn">🖱️ 딸깍 분석하기</button>
+      <button class="btn btn-secondary" id="copyBtn" style="flex:0.4" disabled>복사</button>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="token-info" id="tokenInfo"></div>
+    <div class="result" id="result"></div>
   </div>
 
-  <div class="controls">
-    <button class="btn btn-primary" id="analyzeBtn">🖱️ 딸깍 분석하기</button>
-    <button class="btn btn-secondary" id="copyBtn" style="flex:0.4" disabled>복사</button>
+  <!-- 탭 2: 리뷰 분석기 -->
+  <div class="tab-content" id="tab-review">
+    <div class="review-info" id="reviewInfo">
+      현재 페이지를 감지 중...
+    </div>
+    <div class="controls">
+      <button class="btn btn-review" id="reviewBtn" disabled>리뷰 수집 & 분석</button>
+      <button class="btn btn-secondary" id="reviewCopyBtn" style="flex:0.4" disabled>복사</button>
+    </div>
+    <div class="progress-bar" id="progressBar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <div class="status" id="reviewStatus"></div>
+    <div class="token-info" id="reviewTokenInfo"></div>
+    <div class="result" id="reviewResult"></div>
   </div>
-
-  <div class="status" id="status"></div>
-  <div class="token-info" id="tokenInfo"></div>
-  <div class="result" id="result"></div>
 
   <script src="panel.js"></script>
+  <script src="review.js"></script>
 </body>
 </html>

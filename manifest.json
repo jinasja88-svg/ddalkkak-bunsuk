@@ -21,7 +21,7 @@
     "128": "icons/icon128.png"
   },
   "web_accessible_resources": [{
-    "resources": ["panel.html"],
+    "resources": ["panel.html", "panel.js", "review.js"],
     "matches": ["https://*/*", "http://*/*"]
   }]
 }
