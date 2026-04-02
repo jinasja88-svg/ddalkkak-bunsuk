@@ -41,21 +41,20 @@ copyBtn.addEventListener('click', () => {
   });
 });
 
-// ===== 상태 표시 =====
-function addStep(id, text) {
-  const step = document.createElement('div');
-  step.className = 'step active';
-  step.id = `step-${id}`;
-  step.innerHTML = `⏳ ${text}<span class="loading-dots"></span>`;
-  statusEl.appendChild(step);
+// ===== 상태 표시 (단순 진행률) =====
+let totalSteps = 4;
+let currentStep = 0;
+
+function updateStatus(step, total) {
+  currentStep = step;
+  totalSteps = total;
+  statusEl.innerHTML = `<div class="step active">AI 분석 중 (${step}/${total})<span class="loading-dots"></span></div>`;
 }
-function completeStep(id, text) {
-  const step = document.getElementById(`step-${id}`);
-  if (step) { step.className = 'step done'; step.innerHTML = `✅ ${text}`; }
+function showError(msg) {
+  statusEl.innerHTML = `<div class="step error">분석 실패: ${msg}</div>`;
 }
-function errorStep(id, text) {
-  const step = document.getElementById(`step-${id}`);
-  if (step) { step.className = 'step error'; step.innerHTML = `❌ ${text}`; }
+function clearStatus() {
+  statusEl.innerHTML = '';
 }
 
 // ===== 토큰 비용 =====
@@ -139,8 +138,11 @@ analyzeBtn.addEventListener('click', async () => {
   const userPrompt = promptEl.value.trim() || '이 사이트의 제품을 아주 상세하게 강점, 단점, 스펙 등 분석해서 알려줘';
 
   try {
-    // Step 1: DOM 추출 요청 (content script에게)
-    addStep('dom', '페이지 DOM 텍스트 추출 중');
+    const isTurbo = currentMode === 'turbo';
+    const steps = isTurbo ? 4 : 2;
+
+    // Step 1: DOM 추출
+    updateStatus(1, steps);
     window.parent.postMessage({ type: 'DDALKKAK_EXTRACT_DOM' }, '*');
 
     const domData = await new Promise((resolve, reject) => {
@@ -148,48 +150,44 @@ analyzeBtn.addEventListener('click', async () => {
         if (event.data?.type === 'DDALKKAK_DOM_RESULT') {
           window.removeEventListener('message', handler);
           if (event.data.success) resolve(event.data.data);
-          else reject(new Error(event.data.error || 'DOM 추출 실패'));
+          else reject(new Error(event.data.error || '페이지 정보를 읽을 수 없습니다'));
         }
       };
       window.addEventListener('message', handler);
-      setTimeout(() => { window.removeEventListener('message', handler); reject(new Error('DOM 추출 타임아웃')); }, 10000);
+      setTimeout(() => { window.removeEventListener('message', handler); reject(new Error('페이지 응답 시간 초과')); }, 10000);
     });
-    completeStep('dom', `DOM 추출 완료 (${domData.charCount.toLocaleString()}자)`);
 
-    // Step 2: 검색 (터보 모드)
+    // Step 2~3: 검색 (터보 모드)
     let searchResults = [];
-    if (currentMode === 'turbo') {
-      addStep('query', 'AI가 최적 검색어 생성 중');
+    if (isTurbo) {
+      updateStatus(2, steps);
       const pageTitle = domData.meta.ogTitle || domData.meta.title || '';
       const queryResp = await sendToBackground({
         action: 'GENERATE_SEARCH_QUERY', apiKey: GEMINI_API_KEY, model: GEMINI_MODEL,
         pageTitle, userMessage: userPrompt
       });
       const searchQuery = queryResp?.query || pageTitle.substring(0, 40);
-      completeStep('query', `검색어: "${searchQuery}"`);
 
-      addStep('search', '네이버+구글 검색 + 페이지 수집 중');
+      updateStatus(3, steps);
       const searchResp = await sendToBackground({ action: 'SEARCH_AND_FETCH', query: searchQuery, fetchPages: true });
       searchResults = searchResp?.results || [];
-      if (searchResults.length > 0) completeStep('search', searchResp.debug);
-      else errorStep('search', `검색 결과 없음 (${searchResp?.debug})`);
     }
 
-    // Step 3: Gemini 분석
+    // Step 마지막: Gemini 분석
+    updateStatus(isTurbo ? 4 : 2, steps);
     const prompt = buildPrompt(userPrompt, domData, searchResults);
-    addStep('gemini', `${GEMINI_MODEL}에 분석 요청 중`);
     const resp = await sendToBackground({ action: 'CALL_GEMINI', prompt, apiKey: GEMINI_API_KEY, model: GEMINI_MODEL });
-    if (!resp?.success) throw new Error(resp?.error || 'Gemini API 오류');
-    completeStep('gemini', `${GEMINI_MODEL} 분석 완료`);
+    if (!resp?.success) throw new Error(resp?.error || 'AI 분석에 실패했습니다');
 
+    clearStatus();
     analysisResult = resp.text;
     resultEl.innerHTML = markdownToHtml(resp.text);
     showTokenInfo(resp.usage);
     copyBtn.disabled = false;
 
   } catch (err) {
-    errorStep('gemini', `오류: ${err.message}`);
-    resultEl.innerHTML = `<span style="color:#f87171;">오류: ${err.message}</span>`;
+    showError(err.message);
+    resultEl.innerHTML = '';
   } finally {
     analyzeBtn.disabled = false;
     analyzeBtn.textContent = '🖱️ 딸깍 분석하기';
