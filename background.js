@@ -1,5 +1,18 @@
 // 딸깍분석 - Background Service Worker
-// 검색어 AI 생성 + 네이버/구글 검색 + 페이지 fetch + Gemini API
+// 아이콘 클릭 처리 + 검색어 AI 생성 + 네이버/구글 검색 + 페이지 fetch + Gemini API
+
+// ===== 아이콘 클릭 → content script 주입 (사이드패널 열기) =====
+chrome.action.onClicked.addListener(async (tab) => {
+  if (!tab.id || tab.url?.startsWith('chrome://')) return;
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content.js']
+    });
+  } catch (err) {
+    console.error('Content script injection failed:', err);
+  }
+});
 
 // ===== Gemini API 호출 공통 =====
 async function callGeminiRaw(apiKey, model, prompt, maxTokens = 256) {
