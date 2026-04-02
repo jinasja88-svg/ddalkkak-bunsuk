@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Gallery with Radio Box</title>
+    <link rel="stylesheet" href="bootstrap.min.css">
+    
+    
+    <style>
+        .image-thumbnail {
+            position: relative;
+            display: inline-block;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .image-thumbnail img {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+        }
+
+        .image-radio {
+            position: absolute;
+            top: -2px;
+            left: 2px;
+            z-index: 5;
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: -2px;
+            right: 2px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+
+        .delete-btn:hover {
+            background: #c82333;
+        }
+
+        .image-size-info {
+            position: absolute;
+            bottom: 2px;
+            left: 2px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 10px;
+            padding: 2px 4px;
+            border-radius: 3px;
+            z-index: 10;
+            display: none;
+        }
+
+        #editor_container {
+            width: 1000px;
+            height: 700px;
+        }
+
+        /* .selected-image {
+      width: 50%;
+      height: 50%;
+    } */
+        .vertical-separator {
+            border-left: 1px solid black;
+            height: 100px;
+            /* 세로선의 높이를 조정할 수 있습니다. */
+            margin: 10px;
+        }
+    </style>
+    <script src="js/filerobot-image-editor.min.js"></script>
+</head>
+
+<body>
+    <div class="container-fluid px-5">
+        <div class="mt-4 mb-4 d-flex justify-content-between">
+            <button type="button" class="btn btn-outline-primary" disabled>SMART DATA - 이미지 편집 & 다운로드</button>
+            <!-- <button type="button" class="btn btn-outline-primary" disabled>SMART DATA - 이미지 다운로드</button> -->
+            <div class="w-25">
+                <div class="mr-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="flexRadioDefault" id="downloadimg" checked>
+                        <label class="form-check-label" for="downloadimg">
+                            다운로드
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="flexRadioDefault" id="editimg">
+                        <label class="form-check-label" for="editimg">
+                            이미지편집
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row border-top border-bottom border-end mt-2">
+            <div class="col-lg-7 d-flex flex-column" id="imageContainer">
+                <div class="thumb">
+                    <div class="mt-2 d-flex justify-content-between">
+                        <h6><span class="badge bg-secondary">썸네일이미지</span></h6>
+                        <input class="form-check-input" type="checkbox" id="thumballcheck" checked>
+                    </div>
+                    <div class="mt-2 thumb-container">
+                        <!-- <div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01PpQzzQ1czMr36Ho6F_!!2200565243671-0-cib.jpg" class="thumbimage">
+                            </label>
+                        </div><div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01dTFtR81czMqzkQbmv_!!2200565243671-0-cib.jpg" class="thumbimage">
+                            </label>
+                        </div><div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01pU5w4Y1czMr1jpWKz_!!2200565243671-0-cib.jpg" class="thumbimage">
+                            </label>
+                        </div><div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01t3iLMb1czMqyjWUr0_!!2200565243671-0-cib.jpg" class="thumbimage">
+                            </label>
+                        </div><div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01b7D9rH1czMqwNuvsc_!!2200565243671-0-cib.jpg" class="thumbimage">
+                            </label>
+                        </div> -->
+                    </div>
+                </div>
+                <div class="option border-top mt-4">
+                    <div class="mt-2 d-flex justify-content-between">
+                        <h6><span class="badge bg-secondary">옵션이미지</span></h6>
+                        <input class="form-check-input" type="checkbox" id="optionallcheck" checked>
+                    </div>
+                    <div class="mt-2 option-container">
+                        <!-- <div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01b7D9rH1czMqwNuvsc_!!2200565243671-0-cib.jpg" class="optionimage">
+                            </label>
+                        </div><div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01PpQzzQ1czMr36Ho6F_!!2200565243671-0-cib.jpg" class="optionimage">
+                            </label>
+                        </div> -->
+                    </div>
+                </div>
+
+                <div class="detail border-top mt-4 fixed-size-div overflow-auto">
+                    <div class="mt-2 d-flex justify-content-between">
+                        <h6><span class="badge bg-secondary">상세이미지</span> <small id="detailTotalSize" class="text-muted"></small></h6>
+                        <input class="form-check-input" type="checkbox" id="detailallcheck" checked>
+                    </div>
+                    <div class="mt-2 detail-container">
+                        <!-- <div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01h4lLN61czMkJ9JCKG_!!2200565243671-0-cib.jpg" class="detailimage">
+                            </label>
+                        </div><div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01sj3ae61czMkGVwciP_!!2200565243671-0-cib.jpg" class="detailimage">
+                            </label>
+                        </div><div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01nSYCF51czMkFczTtI_!!2200565243671-0-cib.jpg" class="detailimage">
+                            </label>
+                        </div><div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01YuzODk1czMkDufY2m_!!2200565243671-0-cib.jpg" class="detailimage">
+                            </label>
+                        </div><div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01C2z6371czMkGVzVV0_!!2200565243671-0-cib.jpg" class="detailimage">
+                            </label>
+                        </div><div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01WRdbd71czMk7jaSVa_!!2200565243671-0-cib.jpg" class="detailimage">
+                            </label>
+                        </div><div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN01dN1E2O1czMk9w5YkG_!!2200565243671-0-cib.jpg" class="detailimage">
+                            </label>
+                        </div><div class="image-thumbnail">
+                            <label class="form-check-label">
+                                <input class="form-check-input image-radio" type="checkbox" name="imagecheckbox" checked>
+                                <input class="form-check-input image-radio d-none" type="radio" name="imageRadio">
+                                <img src="https://cbu01.alicdn.com/img/ibank/O1CN018dyu3R1czMkDufY3A_!!2200565243671-0-cib.jpg" class="detailimage">
+                            </label>
+                        </div> -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-9 border-start d-none" id="editMode">
+                <div class="mt-2 row">
+                    <div class="col-md-12 d-flex justify-content-between">
+                        <div class="d-flex justify-content-start align-items-center w-25">
+                            <h6 class="me-2"><span class="badge bg-primary">원본보기</span></h6>
+                            <div class="form-check form-switch me-1">
+                                <input class="form-check-input showOrigin" type="checkbox" role="switch" id="checked1">
+                            </div>
+                        </div>
+                        <!-- <button class="badge bg-danger" id="deleteImage">이미지삭제</button> -->
+                    </div>
+                    <div class="col-md-5 d-none">
+                        <div class="d-flex justify-content-start">
+                            <h6><span class="badge bg-secondary">원본이미지</span></h6>
+                        </div>
+                        <img src="" class="origin-image" id="origin_image_container">
+                    </div>  
+                    <div class="col-md-12">
+                        <div class="d-flex justify-content-start">
+                            <h6><span class="badge bg-secondary">이미지편집</span></h6>
+                            <div class="d-none">
+                                <input class="color" type="color" id="colorpick" value="#FFFFFF">
+                            </div>
+                        </div>
+                        <div class="selected-image" id="editor_container"></div>
+                    </div>
+                                      
+                </div>
+            </div>
+
+            <div class="col-lg-5 border-start" id="downloadMode">
+                <div class="mt-2 w-100">
+                    <div>
+                        <h6><span class="badge bg-secondary">다운로드</span> <small><b> * 이미지 갯수에 따라 뒷부분에 숫자가 자동으로 기입됩니다.</b></small></h6>
+                    </div>
+                    <div class="selected-image w-100 d-flex justify-content-start align-items-baseline">
+                        <p class="w-50 h-100">기본 파일명 (ex. 상품번호) : </p>
+                        <input id="filename" type="text" class="w-50 h-100 form-control" placeholder="기본 파일명" value="이미지">
+                        <p>.jpg</p>
+                    </div>
+                    <div class="selected-image w-100 d-flex justify-content-start align-items-baseline">
+                        <p class="w-50 h-100">썸네일이미지 파일명 구분자 : </p>
+                        <input id="tsp" type="text" class="w-25 h-100 form-control" placeholder="썸네일이미지 파일명 구분자" value="_th_">
+                        <p>.jpg</p>
+                    </div>
+                    <div class="selected-image w-100 d-flex justify-content-start align-items-baseline">
+                        <p class="w-50 h-100">옵션이미지 파일명 구분자 : </p>
+                        <input id="osp" type="text" class="w-25 h-100 form-control" placeholder="옵션이미지 파일명 구분자" value="_op_">
+                        <p>.jpg</p>
+                    </div>
+                    <div class="selected-image w-100 d-flex justify-content-start align-items-baseline">
+                        <p class="w-50 h-100">상세이미지 파일명 구분자 : </p>
+                        <input id="dsp" type="text" class="w-25 h-100 form-control" placeholder="상세이미지 파일명 구분자" value="_d_">
+                        <p>.jpg</p>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-success ml-2 mb-3 w-25" id="downloadbutton">다운로드</button>
+                <button type="button" class="btn btn-success ml-2 mb-3 w-25 d-none" id="getStarted">getStarted</button>
+            </div>
+        </div>
+    </div>
+    <script src="js/imagepage.js"></script>
+    
+    <script src="script.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/apexcharts.min.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Document</title>
+    <style>
+        body{
+            width:620px; 
+            height:600px;
+            font-family: Malgun Gothic;
+            font-size: 10px;
+            line-height: 200%
+        }
+        .fsm{
+            font-size: 60%;
+        }
+    </style>
+    <link rel="stylesheet" href="bootstrap.min.css">
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/apexcharts.min.js"></script>
+    
+</head>
+<body>
+    <!-- <div class="card">
+        <a style="max-height:90px;" href="https://cafe.naver.com/gimpophone/6265" target="_blank"><img style="max-width:100%" src="http://openhost.ohohmyshop.cafe24.com/web/upimg/2202/top_b.png"></a>
+    </div> -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between">
+            <a href="https://sponge-sound-7be.notion.site/SMART-DATA-2922d4212389487b966384bd3586cff9" target="_blank">SMART DATA 사용자 메뉴얼</a>
+            <!-- <div>
+                <span class="badge text-bg-success">스마트스토어</span>
+                <span class="badge text-bg-danger">쿠팡</span>
+            </div> -->
+        </div>
+        <div class="card-body">
+            <div class="card-header">
+            <nav>
+                <div class="nav nav-pills" id="nav-tab" role="tablist">
+                    <button class="nav-link active" style="font-size:90%" id="nav-home-tab" data-bs-toggle="tab" data-bs-target="#nav-home" type="button" role="tab" aria-controls="nav-home" aria-selected="true">판매량분석</button>
+                    <button class="nav-link" style="font-size:90%" id="nav-contact-tab" data-bs-toggle="tab" data-bs-target="#nav-contact" type="button" role="tab" aria-controls="nav-contact" aria-selected="false">리뷰분석</button>
+                    <button class="nav-link" style="font-size:90%" id="nav-profile-tab" data-bs-toggle="tab" data-bs-target="#nav-profile" type="button" role="tab" aria-controls="nav-profile" aria-selected="false">옵션분석</button>
+                    <button class="nav-link" style="font-size:90%" id="nav-store-tab" data-bs-toggle="tab" data-bs-target="#nav-store" type="button" role="tab" aria-controls="nav-store" aria-selected="false">스토어분석</button>
+                    <button class="nav-link" style="font-size:90%" id="nav-disabled-tab" data-bs-toggle="tab" data-bs-target="#nav-disabled" type="button" role="tab" aria-controls="nav-disabled" aria-selected="false">실시간판매량</button>
+                    <button class="nav-link" style="font-size:90%" id="nav-coupang-tab" data-bs-toggle="tab" data-bs-target="#nav-coupang" type="button" role="tab" aria-controls="nav-coupang" aria-selected="false">개인통관고유부호</button>
+                    <button class="nav-link" style="font-size:90%" id="nav-makepage-tab" data-bs-toggle="tab" data-bs-target="#nav-makepage" type="button" role="tab" aria-controls="nav-makepage" aria-selected="false">이미지편집&다운로드</button>
+
+                    <!-- <button class="nav-link active" style="font-size:80%" id="nav-home-tab" data-bs-toggle="tab" data-bs-target="#nav-home" type="button" role="tab" aria-controls="nav-home" aria-selected="true">판매량분석<span class="badge bg-success ms-1">S</span></button>
+                    <button class="nav-link" style="font-size:80%" id="nav-contact-tab" data-bs-toggle="tab" data-bs-target="#nav-contact" type="button" role="tab" aria-controls="nav-contact" aria-selected="false">리뷰분석<span class="badge bg-success ms-1">S</span><span class="badge bg-danger">C</span></button>
+                    <button class="nav-link" style="font-size:80%" id="nav-profile-tab" data-bs-toggle="tab" data-bs-target="#nav-profile" type="button" role="tab" aria-controls="nav-profile" aria-selected="false">옵션분석<span class="badge bg-success ms-1">S</span><span class="badge bg-danger">C</span></button>
+                    <button class="nav-link" style="font-size:80%" id="nav-store-tab" data-bs-toggle="tab" data-bs-target="#nav-store" type="button" role="tab" aria-controls="nav-store" aria-selected="false">스토어분석<span class="badge bg-success ms-1">S</span></button>
+                    <button class="nav-link" style="font-size:80%" id="nav-disabled-tab" data-bs-toggle="tab" data-bs-target="#nav-disabled" type="button" role="tab" aria-controls="nav-disabled" aria-selected="false">실시간판매량<span class="badge bg-success ms-1">S</span></button>
+                    <button class="nav-link" style="font-size:80%" id="nav-coupang-tab" data-bs-toggle="tab" data-bs-target="#nav-coupang" type="button" role="tab" aria-controls="nav-coupang" aria-selected="false">개인통관고유부호<span class="badge bg-success ms-1">S</span></button>
+                    <button class="nav-link" style="font-size:80%" id="nav-makepage-tab" data-bs-toggle="tab" data-bs-target="#nav-makepage" type="button" role="tab" aria-controls="nav-makepage" aria-selected="false">이미지편집&다운로드</button>
+                    <button class="nav-link" style="font-size:80%" id="nav-deleteCookie-tab" data-bs-toggle="tab" data-bs-target="#nav-deleteCookie" type="button" role="tab" aria-controls="nav-deleteCookie" aria-selected="false">쿠키삭제<span class="badge bg-danger ms-1">C</span></button>
+                    <button class="nav-link" style="font-size:80%" id="nav-trackingRank-tab" data-bs-toggle="tab" data-bs-target="#nav-trackingRank" type="button" role="tab" aria-controls="nav-trackingRank" aria-selected="false">순위찾기<span class="badge bg-success ms-1">S</span><span class="badge bg-danger">C</span></button> -->
+                </div>
+            </nav>
+            </div>
+            <div class="tab-content fs-10" id="nav-tabContent">
+                <div class="tab-pane fade show active" id="nav-home" role="tabpanel" aria-labelledby="nav-home-tab" tabindex="0">
+
+                    <div class="text-center d-block mt-3" id="salesconfirm">
+                        <!-- <h5 class="card-title">판매량 분석</h5> -->
+                        <p class="card-text">스마트스토어 상품 페이지에서 판매량을 확인하세요</p>
+                        <button type="button" class="btn btn-primary" id="productsales">판매량분석</button>
+                    </div>
+
+                    <div class="container text-center mt-3 d-none" id="sales">
+                        <p class="mt-4 text-center" style="font-size:90%"><span style="font-weight:bold"><u>판매량분석</u></span><br><small>1개월 판매량을 바탕으로 분석한 예상 월 순익</small></p>
+                        <p class="mt-2 shadow-lg p-3 mb-5 bg-body rounded text-primary fw-bold fs-1"><span id="m1s2">0</span>원</p>
+                        <div class="row h-100 mt-3">
+                            <div class="col"></div>
+                            <div class="col"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50 my-auto">7일</div></div>
+                            <div class="col"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50">1개월</div></div>
+                            <div class="col"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50">3개월</div></div>
+                            <div class="col"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50">6개월</div></div>     
+                            <div class="col"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50">1년</div></div>     
+                            <div class="col"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50">2년</div></div>     
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col"><div class="badge bg-success text-wrap w-100 h-100 align-middle top-50 start-50">판매량</div></div>
+                            <div class="col text-center fsm" id="d7">7일</div>
+                            <div class="col text-center fsm" id="m1">1개월</div>          
+                            <div class="col text-center fsm" id="m3">3개월</div>          
+                            <div class="col text-center fsm" id="m6">6개월</div>
+                            <div class="col text-center fsm" id="y1">1년</div>
+                            <div class="col text-center fsm" id="y2">2년</div>          
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col"><div class="badge bg-success text-wrap w-100 h-100 align-middle top-50 start-50">매출</div></div>
+                            <div class="col text-center fsm" id="md7">7일</div>
+                            <div class="col text-center fsm" id="mm1">1개월</div>          
+                            <div class="col text-center fsm" id="mm3">3개월</div>          
+                            <div class="col text-center fsm" id="mm6">6개월</div>        
+                            <div class="col text-center fsm" id="my1">1년</div>
+                            <div class="col text-center fsm" id="my2">2년</div>             
+                        </div>                        
+                        <div class="row mt-3">
+                            <div class="col"><div class="badge bg-success text-wrap w-100 h-100 align-middle top-50 start-50">순익</div></div>
+                            <div class="col text-center fsm" id="sd7">7일</div>
+                            <div class="col text-center fsm" id="sm1">1개월</div>          
+                            <div class="col text-center fsm" id="sm3">3개월</div>          
+                            <div class="col text-center fsm" id="sm6">6개월</div>        
+                            <div class="col text-center fsm" id="sy1">1년</div>
+                            <div class="col text-center fsm" id="sy2">2년</div>            
+                        </div>    
+                        <div class="row mt-5">
+                            <div class="col-5 text-start" style="font-size:80%">순익 = 매출의 &nbsp;<input id="rateprofit" type="number" value="40" style="width:20%;">&nbsp;% 기준</div>
+                            <div class="col-12 text-start" style="font-size:80%">판매량은 구매자수입니다.</div>
+                            <div class="col-12 text-start" style="font-size:80%">(같은 옵션 2개 구매 시 1건으로 기록됨)</div>
+                        </div>                                              
+                    </div>
+
+                </div>
+
+                <div class="tab-pane fade" id="nav-contact" role="tabpanel" aria-labelledby="nav-contact-tab" tabindex="0">
+                    <div class="text-center d-block mt-3" id="reviewconfirm">
+                        <!-- <h5 class="card-title">리뷰 분석</h5> -->
+                        <p class="card-text">리뷰 트렌드 및 아이디 반복성을 분석합니다.</p>
+                        <button type="button" class="btn btn-primary" id="reviewanalysis">리뷰분석</button>
+                        <div class="spinner-border text-primary d-none text-center start-50 w-100" role="status" id="reviewspinner">
+                            <!-- <span>Loading...</span> -->
+                        </div>
+                        <div class="d-none" id="rvpercent">
+                            <span id="reviewprogress">0</span><span> %</span>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-none text-center" id="review">
+                        <p class="mt-4 text-center" style="font-size:90%"><span style="font-weight:bold"><u>리뷰분석</u></span><br><small>리뷰수/평점 및 반복되는 항목에 대한 분석 결과입니다.<br>
+                            데이터가 많을 경우 최근 데이터 일부만 가져올 수 있습니다.
+                        </small></p>
+                        <p class="mt-2 shadow-lg p-3 mb-5 bg-body rounded text-primary fw-bold fs-4">
+                            리뷰수 :&nbsp;<span id="reviewqty">0</span><br>
+                            평점 :&nbsp;<span id="reviewscore">0</span><br>
+                            <!-- 반복아이디수 :&nbsp;<span id="reviewrepeatid">0</span><br> -->
+                            동일아이디 최대반복횟수 :&nbsp;<span id="maxrepeat">0</span><br>
+                            <!-- 최대반복횟수 아이디 :&nbsp;<span id="maxrepeatid">0</span><br> -->
+                            <!-- 반복리뷰내용수 :&nbsp;<span id="reviewcontent">0</span> -->
+                            <!-- 리뷰수 :&nbsp;<span id="m1s2">0</span>&nbsp;(판매량&nbsp;<span id="m1s2">감소</span>&nbsp;추세)<br>
+                            평점 :&nbsp;<span id="m1s2">0</span>&nbsp;(<span id="m1s2">매우높음</span>)<br>
+                            반복아이디수 :&nbsp;<span id="m1s2">0</span> -->
+                        </p>
+                        <!-- <canvas class="mt-3 mb-3" id="lineChart" height="100%"></canvas>  -->
+                        
+                        <button type="button" class="btn btn-primary" id="reviewdownload">리뷰내역 다운로드</button>
+
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="nav-profile" role="tabpanel" aria-labelledby="nav-profile-tab" tabindex="0">
+                    <div class="text-center d-block mt-3" id="optionconfirm">
+                        <!-- <h5 class="card-title">리뷰 분석</h5> -->
+                        <p class="card-text">리뷰 데이터의 옵션별 판매비율을 기반으로 <br>소싱할 제품의 최적비율을 분석합니다.</p>
+                        <button type="button" class="btn btn-primary" id="optionanalysis">옵션분석</button>
+                        <div class="spinner-border text-primary d-none text-center start-50 w-100" role="status" id="optionspinner">
+                            <!-- <span>Loading...</span> -->
+                        </div>
+                        <div class="d-none" id="percent">
+                            <span id="optionprogress">0</span><span> %</span>
+                        </div>
+                    </div>
+                    <div class="mt-3 d-none" id="option">
+                        <p class="mt-4 text-center" style="font-size:90%"><span style="font-weight:bold"><u>옵션분석</u></span><br><small>옵션별 리뷰비율을 기반으로 소싱수량 또는 소싱예산에 따른 옵션별 소싱비율 분석결과입니다.</small></p>
+                        <canvas class="mt-3" id="stChart"></canvas>
+                        <div class="mt-3 mb-3">
+                            <div class="input-group input-group-sm">
+                                <!-- <span class="input-group-text" style="width:40%" id="qty">매입가 : 판매가의&nbsp;<input class="w-25 mt-1 mb-1" id="ratepurchase" type="number" value="40">&nbsp;% 기준</span> -->
+                                <span class="input-group-text" style="width:30%">총 구매수량</span>
+                                <input type="number" class="form-control" style="width:70%" aria-label="Sizing example input" aria-describedby="inputGroup-sizing-md" value="300" id="qty">
+                            
+                                <!-- <span class="input-group-text" id="budget" style="width:12%">예산(원)</span>
+                                <input type="number" class="form-control" style="width:20%" aria-label="Sizing example input" aria-describedby="inputGroup-sizing-md" value="1000000"> -->
+                            </div>
+
+                        </div>
+                           
+                        
+                        <div class="mt-0">
+
+                            <div class="row text-center" style="font-size:18px;margin-top:5px" id="optiontable">
+                                <div class="col-6"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50 text-center">옵션명</div></div>
+                                <div class="col-2"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50 text-center">수량</div></div>
+                                <div class="col-2"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50 text-center">비율</div></div>
+                                <div class="col-2"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50 text-center">구매수량</div></div>
+                            </div>                                                                           
+                        </div>
+                        <div class="mt-0" id="optiondetail">
+
+                        </div>
+                        <button type="button" class="btn btn-primary mt-3" id="optiondownload">옵션비율 다운로드</button>
+
+                    </div>
+
+                    
+                </div>
+                
+                <div class="tab-pane fade" id="nav-store" role="tabpanel" aria-labelledby="nav-store-tab" tabindex="0">
+                    <div class="text-center d-block mt-3" id="storeconfirm">
+                        <!-- <h5 class="card-title">리뷰 분석</h5> -->
+                        <p class="card-text">스토어 전체 제품에 대한 판매현황을 분석합니다.</p>
+                        <button type="button" class="btn btn-primary" id="storeanalysis">스토어분석</button>
+                        <div class="spinner-border text-primary d-none text-center start-50 w-100" role="status" id="storespinner">
+                            <!-- <span>Loading...</span> -->
+                        </div>
+                        <div class="d-none" id="storepercent">
+                            <span id="storeprogress">0</span><span> %</span>
+                        </div>
+                    </div>
+                    
+                    <div class="container text-center mt-3 d-none" id="store">
+                        <p class="mt-4 text-center" style="font-size:90%"><span style="font-weight:bold"><u>스토어분석</u></span><br><small>스토어 판매 전체상품에 대한 판매량분석 결과 예상 월순익</small></p>
+                        <p class="mt-2 shadow-lg p-3 mb-2 bg-body rounded text-primary fw-bold fs-1"><span id="allm6">0</span>원</p>
+                        <p class="mt-2 text-center">[상위 10위 상품 1개월 순익]</p>
+                        <canvas class="mt-1" id="storeChart"></canvas>
+                        
+                        <div class="row mt-2">
+                            <div class="col-5 text-start" style="font-size:80%">순익 = 매출의 &nbsp;<input id="rateprofitall" type="number" value="40" style="width:20%;">&nbsp;% 기준</div>
+                        </div>                                              
+                        <button type="button" class="btn btn-primary mt-3" id="storedownload">스토어 전체 판매내역 다운로드</button>
+                    </div>
+                    
+
+                </div>                
+                <div class="tab-pane fade" id="nav-disabled" role="tabpanel" aria-labelledby="nav-disabled-tab" tabindex="0">
+                    <div class="text-center d-block mt-3" id="rtconfirm">
+                        <p class="card-text">옵션별 재고 변화량을 실시간으로 확인하세요<br>분석 중에 현재 브라우저 상태를 변경할 경우 분석이 중단됩니다.</p>
+                        <button type="button" class="btn btn-primary" id="rtanalysis">실시간판매량분석</button>
+                        
+                    </div>
+
+                    <div class="container text-center mt-3 d-none" id="rt">
+                        <p class="mt-4 text-center" style="font-size:90%"><span style="font-weight:bold"><u>실시간 모니터링중</u>
+                            <div class="spinner-border text-primary text-center start-50" role="status" id="rtspinner">
+                                
+                            </div>
+                        </span><br><br><small>1분 간격으로 실시간 재고데이터를 기반으로 옵션별 판매량이 추가됩니다.
+                            <br>특정 시간대에 판매자가 임의로 옵션재고, 옵션명을 변경할 경우<br> 해당 시간대의 데이터가 정확하지 않을 수 있습니다. 
+                        </small></p>
+                        <p class="mt-2 shadow-lg p-3 mb-4 bg-body rounded text-primary fw-bold fs-4">
+                            현재까지 판매량 :&nbsp;<span id="rtqty">0</span>개<br>
+                            현재까지 판매매출 :&nbsp;<span id="rtsales">0</span>원
+                        </p>
+                        <div class="row h-100 mt-3">
+                            <div class="col-6"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50">옵션명</div></div>
+                            <div class="col-2"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50">판매시간</div></div>
+                            <div class="col-2"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50">판매수량</div></div>
+                            <div class="col-2"><div class="badge bg-primary text-wrap w-100 h-100 align-middle top-50 start-50">판매매출</div></div>     
+                        </div>
+ 
+                        <div class="mt-2" id="rtdetail">                         
+                        </div>   
+                        <button type="button" class="btn btn-primary mt-3" id="rtdownload">실시간 판매내역 다운로드</button>
+                    </div>
+                </div>
+
+
+
+                    
+                <div class="tab-pane fade" id="nav-coupang" role="tabpanel" aria-labelledby="nav-coupang-tab" tabindex="0">
+                    <div class="text-center d-block mt-3" id="rtcoupangconfirm">
+                        <!-- <h5 class="card-title">판매량 분석</h5> -->
+                        
+                        <div class="d-flex justify-content-center align-items-center">
+                            <button type="button" class="btn btn-outline-success d-flex justify-content-start align-items-center" id="pccnaver">
+                            <img src="https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyMTEwMjlfMjMg%2FMDAxNjM1NDczMDA5Mjg4.p0ditqy_nx7OTy6u-oWHGP9VU73hO0K9r2JSpsMPnuQg.NNTyLAu-6M7fP7HsMbwFzzAw12OKgu5pd_evj4W4lmYg.JPEG.merrily1204%2F%25B9%25AB%25C1%25A6-1%25A4%25B7%25C8%25A6.jpg&type=sc960_832" alt="Smartstore Logo" width="30" height="30" class="d-inline-block align-text-top">
+                            &nbsp;스마트스토어 개인통관고유부호 확인</button>
+                        </div>
+                        <div class="d-flex justify-content-start mt-2 d-none">
+                            <button type="button" class="btn btn-outline-danger d-flex justify-content-start align-items-center" id="pcccoupang">
+                            <img src="https://play-lh.googleusercontent.com/vQDaqflYMGXqN0NkPju5d_LZCdqRiqWw29S97A9quVzrqy2kBp2qnkeThnRCWBBKpVo" alt="Coupang Logo" width="30" height="30" class="d-inline-block align-text-top">
+                            &nbsp;쿠팡 개인통관고유부호 확인</button>  
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between mt-3">
+                            <input id="pccname" class="form-control" type="text" placeholder="이름" aria-label="default input example">
+                            <input id="pcctel" class="form-control" type="text" placeholder="연락처" aria-label="default input example">
+                            <input id="pccno" class="form-control" type="text" placeholder="개인통관고유부호" aria-label="default input example">
+                        </div>
+                        
+                        <button type="button" class="btn btn-success mt-3" id="confirmpcc">개인통관고유부호확인</button>
+                        <div id="pccsuccess" class="fs-3 text-bg-primary p-3 mt-3 d-none">일치</div>
+                        <div id="pccfail" class="fs-3 text-bg-danger p-3 mt-3 d-none">불일치<br>
+                            <span class="fs-6">(</span>
+                            <span class="fs-6" id="errorcontent"></span>
+                            <span class="fs-6">)</span>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <div class="tab-pane fade" id="nav-makepage" role="tabpanel" aria-labelledby="nav-makepage-tab" tabindex="0">
+                    <div class="text-center d-block mt-3" id="makepagepanel">
+                        <div class="d-flex justify-content-center flex-column align-items-center">
+                            <p class="card-text">1688 상품 이미지를 편집하고 다운로드 할 수 있습니다.<br>(다른 사이트도 update 예정)</p>
+                            <button type="button" class="btn btn-primary d-flex justify-content-start align-items-center" id="page1688">
+                            1688 이미지 편집 & 다운로드</button>
+                            <!-- <button type="button" class="btn btn-outline-primary d-flex justify-content-start align-items-center" id="page1688">
+                                &nbsp;1688 이미지 다운로드</button> -->
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="tab-pane fade" id="nav-deleteCookie" role="tabpanel" aria-labelledby="nav-deleteCookie-tab" tabindex="0">
+                    <div class="text-center d-block mt-3" id="delete_cookie">
+                        <div class="d-flex justify-content-center flex-column align-items-center">
+                            <p class="card-text">현재 사이트와 관련된 모든 쿠키가 삭제됩니다.(시크릿모드)</p>
+                            <button type="button" class="btn btn-primary d-flex justify-content-start align-items-center" id="delCookie">쿠키삭제</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="nav-trackingRank" role="tabpanel" aria-labelledby="nav-trackingRank-tab" tabindex="0">
+                    <div class="text-center d-block mt-3" id="trackingRank">
+                        <p class="card-text">내 상품의 현재 랭킹을 추적합니다.</p>
+                        <div class="d-flex justify-content-between mt-3">
+                            <input id="keyword" class="form-control" type="number" placeholder="검색키워드" aria-label="default input example">
+                            <input id="searchProduct" class="form-control" type="text" placeholder="상품명" aria-label="default input example">
+                        </div>
+                        
+                        <button type="button" class="btn btn-success mt-3" id="confirmpcc">랭킹추적</button>
+                        <div id="searchResult" class="fs-3 text-bg-primary p-3 mt-3 d-none">null</div>
+                    </div>
+                </div>    
+
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- <div id="polistsandsales" style="display:block;">
+            <div class="box-root padding-top--48 padding-bottom--24 flex-flex flex-justifyContent--center">
+              <h2>COUPLUS</h2>
+            </div>
+            
+            <div class="formbg-outer">
+              <div class="formbg">
+                <div class="formbg-inner padding-horizontal--48">
+                  <form id="stripe-login">       
+                    
+                    <div class="field padding-bottom--24">
+                        <h3>(1688 제품페이지에 접속한 상태에서 실행해 주세요)</h3>
+                      </div>              
+                    <div class="field padding-bottom--12">
+                      <input type="button" name="submit" value="상세페이지 생성" id="makepage">
+                    </div>
+                    <div class="field padding-bottom--24">
+                        <input type="button" name="submit" value="상품DB UPDATE &nbsp; (1688구매시)" id="dbupdate">
+                      </div>                    
+                    <div class="field padding-bottom--24">
+                        <h3>(쿠팡Supplier에 접속한 상태에서 실행해 주세요)</h3>
+                      </div>              
+                    <div class="field padding-bottom--12">
+                      <input type="button" name="submit" value="발주서 수집" id="addpo">
+                      
+                    </div>
+                    <div class="field">
+                        <input type="button" name="submit" value="판매현황 수집" id="addsales">
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+    </div>   
+    <div id="makepages" style="padding:20px;display:none;">
+        <form>
+            <card style="border-width:1px">
+            <div style="width:100%">
+                <button type="button" id="btn03" style="float:right;background-color: #5469d4;border-style:initial;border-radius:5px;color:#FFFFFF;height:40px;width:250px;font-weight: bold;">발주서/판매현황 수집으로 전환</button>
+                <h7 style="font-weight:bold">상품번호 : </h7><input type="text" placeholder="상품번호입력" id="product_num" name="product_num" size="10">
+                
+                
+                <br>
+                <h7 style="font-weight:bold">상세페이지상단문구</h7><br><input type="text" placeholder="상품명입력" id="product_name" name="product_name" size="40">
+                <br><textarea cols="42" rows="" type="text" placeholder="MD comment" id="mdcomment" name="mdcomment" wrap="physical"></textarea>
+                <br> 
+                <button type="button" id="btn02">옵션정보 + 재고 가져오기</button>
+                <br>
+            </div>
+            </card>
+            <h10> </h10>
+            <div class="optionwrap">
+                <div style="display:none">
+                    <h7 style="font-weight:bold">최저 허용 상세이미지(px) : </h7><input type="text" placeholder="단위:px" id="imagelimit" name="imagelimit" size="10" value="400">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <h7 style="font-weight:bold">썸네일 이미지 파일 구분자 : </h7><input type="text" placeholder="단위:px" id="thumbdivider" name="thumbdivider" size="10" value="_th_">
+                </div>
+                <div style="display:none">
+                    <h7 style="font-weight:bold">최대 다운 썸네일수(limit) : </h7><input type="text" placeholder="기본:4장" id="maxthumbqty" name="maxthumbqty" size="10" value="5">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <h7 style="font-weight:bold">옵션 이미지 파일 구분자 : </h7><input type="text" placeholder="단위:px" id="optiondivider" name="optiondivider" size="10" value="_op_">
+                </div>
+                <div style="display:none">
+                    <h7 style="font-weight:bold">옵션조합 구분자 : </h7><input type="text" placeholder="기본:띄워쓰기" id="divider" name="divider" size="10">
+                </div>
+
+                <div>
+                    <div style="float:left">
+                        <div class="option" style="margin:auto;text-align: center;"><label>옵션1<br>중국어<br><br></label></div>
+                        <textarea class="option_chinese" cols="5" rows="5" id="option1_ch" name="option1_ch" style="height:120px" wrap="off"></textarea>
+                    </div>
+                    <div style="float:left">
+                        <div class="option" style="margin:auto;text-align: center;"><label>옵션2<br>중국어<br><br></label></div>
+                        <textarea class="option_chinese" cols="5" rows="5" id="option2_ch" name="option2_ch" style="height:120px" wrap="off"></textarea>
+                    </div>
+                    <div style="float:left">
+                        <div class="option" style="margin:auto;text-align: center;"><label>옵션1<br>중국어<br>조합</label></div>
+                        <textarea class="option_chinese" cols="10" rows="5" id="option1_ch_comb" name="option1_ch_comb" style="height:120px" wrap="off"></textarea>
+                    </div>
+                    <div style="float:left">
+                        <div class="option" style="margin:auto;text-align: center;"><label>옵션2<br>중국어<br>조합</label></div>
+                        <textarea class="option_chinese" cols="10" rows="5" id="option2_ch_comb" name="option2_ch_comb" style="height:120px" wrap="off"></textarea>
+                    </div>  
+                    <div style="float:left">
+                        <div class="option" style="margin:auto;text-align: center;"><label>옵션<br>조합별<br>재고</label></div>
+                        <textarea class="option_chinese" cols="5" rows="5" id="option_stock" name="option_stock" style="height:120px;" wrap="off"></textarea>
+                    </div>
+                    <div style="float:left">
+                        <div class="option2" style="margin:auto;text-align: center;background-color: rgb(255, 210, 156);"><label>옵션1<br>한국어<br>(이미지)</label></div>
+                        <textarea class="option_korean" cols="5" rows="5" id="option1_kr" name="option1_kr" style="height:120px" wrap="off"></textarea>
+                    </div>  
+                    <div style="float:left">
+                        <div class="option2" style="margin:auto;text-align: center;"><label>옵션2<br>한국어<br><br></label></div>
+                        <textarea class="option_korean" cols="5" rows="5" id="option2_kr" name="option2_kr" style="height:120px" wrap="off"></textarea>
+                    </div>  
+                    <div style="float:left">
+                        <div class="option2" style="margin:auto;text-align: center;"><label>옵션<br>조합<br>한국어</label></div>
+                        <textarea class="option_korean" cols="5" rows="5" id="option_kr_comb" name="option_kr_comb" style="height:120px" wrap="off"></textarea>
+                    </div>  
+                    <div style="float:left">
+                        <div class="option2" style="margin:auto;text-align: center;border-right: solid 1px #F29661;"><label>상품명<br>옵션조합<br>한국어</label></div>
+                        <textarea class="option_korean" cols="10" rows="5" id="name_kr_comb" name="name_kr_comb" style="height:120px;border-right: solid 1px #F29661;" wrap="off"></textarea>
+                    </div>                                                                                    
+                    <br>
+                </div>
+                <div>
+                    <button type="button" id="btn01">이미지 다운로드 & 상세페이지 생성</button>
+                </div>
+            </div>
+            
+            
+        </form>
+    </div>    -->
+    <script src="popup.js"></script>
+    <script type="text/javascript" src="js/Chart.bundle.min.js"></script>
+    <script type="text/javascript" src="js/chartjs-plugin-labels.min.js"></script>
+    <!-- <script type="text/javascript" src="js/Utils.js"></script> -->
+    <script type="text/javascript" src="js/sheets.js"></script>
+</body>
+</html>

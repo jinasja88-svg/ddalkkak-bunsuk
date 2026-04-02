@@ -1,0 +1,40 @@
+{
+   "action": {
+      "default_icon": {
+         "128": "/images/icon.png",
+         "16": "/images/icon.png",
+         "32": "/images/icon.png",
+         "48": "/images/icon.png"
+      },
+      "default_popup": "popup.html"
+   },
+   "background": {
+      "service_worker": "background.js"
+   },
+   "content_scripts": [ {
+      "js": [ "script.js" ],
+      "match_origin_as_fallback": true,
+      "matches": [ "*://*/*" ]
+   } ],
+   "declarative_net_request": {
+      "rule_resources": [ {
+         "enabled": true,
+         "id": "ruleset_1",
+         "path": "rules.json"
+      } ]
+   },
+   "description": "스마트스토어 쿠팡 이커머스 통합 분석 솔루션",
+   "host_permissions": [ "*://*/*" ],
+   "icons": {
+      "128": "/images/icon.png",
+      "16": "/images/icon.png",
+      "32": "/images/icon.png",
+      "48": "/images/icon.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4+lyCrC0ECkgAJYPUQgUNZArIjr/iVxjGBNQmIUvpwT6bf35Wgssy4LdsqVsj5oHcvSWztWDkLuW1KVV0zac5Ifi/FrqZhj3USYQ0WsT7nmo52z5t61qq3VsgL17LF2k+iDlvop+8aemMPyfez362nEWNABUea5/ml4gPSUjcO2TUmXIufCNjdr+QOHff6YB7CgyOmNB5mEVjMt+450XGxlqJX7dpeaQUv4FG3HJvJj6KPTI1sn1+UiphQUKUzjQ6Lq2DWQ4ca2wMrLrY///BoFPNu7Kq9hzi7SqlgVKoZFev1PEbYMBWqKucJiN1y/SMRXGMKw0V5uZUMxcLsNvAwIDAQAB",
+   "manifest_version": 3,
+   "name": "스마트스토어 쿠팡 분석 - SMART DATA 스마트데이터",
+   "permissions": [ "activeTab", "scripting", "tabs", "cookies", "declarativeNetRequest" ],
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "3.6"
+}
