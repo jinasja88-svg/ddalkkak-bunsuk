@@ -233,29 +233,69 @@
     return { supported: false };
   }
 
-  // 리뷰 API 호출 (POST 방식)
-  async function fetchReviewPage(isBrand, merchantNo, productNo, page, pageSize) {
+  // 리뷰 API 호출 (POST 방식, reviewScore로 별점 필터링)
+  async function fetchReviewsByScore(isBrand, merchantNo, productNo, reviewScore, page, pageSize) {
     const prefix = isBrand ? 'https://brand.naver.com/n' : 'https://smartstore.naver.com/i';
     const apiUrl = `${prefix}/v1/contents/reviews/query-pages`;
+
+    const body = {
+      checkoutMerchantNo: merchantNo,
+      originProductNo: productNo,
+      page,
+      pageSize,
+      reviewSearchSortType: 'REVIEW_RANKING',
+      reviewScore
+    };
 
     const resp = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'accept': 'application/json', 'content-type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({
-        checkoutMerchantNo: merchantNo,
-        originProductNo: productNo,
-        page,
-        pageSize,
-        reviewSearchSortType: 'REVIEW_RANKING'
-      })
+      body: JSON.stringify(body)
     });
 
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return await resp.json();
   }
 
-  // 리뷰 수집 메인 (info는 __PRELOADED_STATE__에서 가져온 상품 정보)
+  // 특정 별점의 리뷰를 maxCount개까지 수집
+  async function collectByScore(info, score, maxCount, onProgress) {
+    const reviews = [];
+    const pageSize = 30;
+    let page = 1;
+
+    try {
+      const first = await fetchReviewsByScore(info.isBrand, info.merchantNo, info.productNo, score, 1, pageSize);
+      const totalPages = first.totalPages || 1;
+      const totalElements = first.totalElements || 0;
+
+      for (const r of first.contents || []) {
+        if (r.reviewContent?.trim().length > 5) reviews.push(r.reviewContent.trim());
+        if (reviews.length >= maxCount) break;
+      }
+
+      const maxPages = Math.min(totalPages, Math.ceil(maxCount / pageSize) + 1);
+
+      for (page = 2; page <= maxPages && reviews.length < maxCount; page++) {
+        await new Promise(r => setTimeout(r, 300));
+        try {
+          const data = await fetchReviewsByScore(info.isBrand, info.merchantNo, info.productNo, score, page, pageSize);
+          if (!data.contents || data.contents.length === 0) break;
+          for (const r of data.contents) {
+            if (r.reviewContent?.trim().length > 5) reviews.push(r.reviewContent.trim());
+            if (reviews.length >= maxCount) break;
+          }
+        } catch { break; }
+        if (onProgress) onProgress(reviews.length, Math.min(totalElements, maxCount));
+      }
+    } catch (err) {
+      // 해당 별점 리뷰가 없을 수 있음
+    }
+
+    return reviews;
+  }
+
+  // 리뷰 수집 메인
   async function collectReviewsWithInfo(info, maxReviews) {
     const sendProgress = (text, pct) => {
       iframe.contentWindow.postMessage({ type: 'DDALKKAK_REVIEW_PROGRESS', percent: pct, text }, '*');
@@ -264,59 +304,38 @@
       iframe.contentWindow.postMessage({ type: 'DDALKKAK_REVIEW_RESULT', success: false, error }, '*');
     };
 
-    const pageSize = 30;
-    let allReviews = [];
-
-    sendProgress('리뷰 수집 중', 5);
-
     try {
-      const first = await fetchReviewPage(info.isBrand, info.merchantNo, info.productNo, 1, pageSize);
-      const totalPages = first.totalPages || 1;
+      // 1점 리뷰 수집
+      sendProgress('1점 리뷰 수집 중', 5);
+      const reviews1 = await collectByScore(info, 1, maxReviews,
+        (got, total) => sendProgress(`1점 리뷰 수집 중 (${got}개)`, 5 + (got / maxReviews) * 10));
 
-      for (const r of first.contents || []) {
-        allReviews.push({ score: r.reviewScore, text: (r.reviewContent || '').trim() });
-      }
+      // 2점 리뷰 수집
+      sendProgress('2점 리뷰 수집 중', 20);
+      const reviews2 = await collectByScore(info, 2, maxReviews - reviews1.length,
+        (got, total) => sendProgress(`2점 리뷰 수집 중 (${got}개)`, 20 + (got / maxReviews) * 10));
 
-      const maxPages = Math.min(totalPages, Math.ceil((maxReviews * 2) / pageSize) + 2);
+      // 5점 리뷰 수집
+      sendProgress('5점 리뷰 수집 중', 40);
+      const reviews5 = await collectByScore(info, 5, maxReviews,
+        (got, total) => sendProgress(`5점 리뷰 수집 중 (${got}개)`, 40 + (got / maxReviews) * 25));
 
-      for (let page = 2; page <= maxPages; page++) {
-        await new Promise(r => setTimeout(r, 300));
+      const negativeReviews = [...reviews1, ...reviews2].slice(0, maxReviews);
+      const positiveReviews = reviews5.slice(0, maxReviews);
 
-        try {
-          const data = await fetchReviewPage(info.isBrand, info.merchantNo, info.productNo, page, pageSize);
-          if (!data.contents || data.contents.length === 0) break;
+      sendProgress('AI 분석 요청 중', 70);
 
-          for (const r of data.contents) {
-            allReviews.push({ score: r.reviewScore, text: (r.reviewContent || '').trim() });
-          }
-        } catch { break; }
+      iframe.contentWindow.postMessage({
+        type: 'DDALKKAK_REVIEW_RESULT',
+        success: true,
+        positiveReviews,
+        negativeReviews,
+        productName: info.productName
+      }, '*');
 
-        sendProgress(`리뷰 수집 중 (${allReviews.length}개)`, 5 + (page / maxPages) * 60);
-      }
     } catch (err) {
       sendError(`리뷰 수집 실패: ${err.message}`);
-      return;
     }
-
-    const positiveReviews = allReviews
-      .filter(r => r.score === 5 && r.text.length > 5)
-      .map(r => r.text)
-      .slice(0, maxReviews);
-
-    const negativeReviews = allReviews
-      .filter(r => r.score <= 2 && r.text.length > 5)
-      .map(r => r.text)
-      .slice(0, maxReviews);
-
-    sendProgress('AI 분석 요청 중', 70);
-
-    iframe.contentWindow.postMessage({
-      type: 'DDALKKAK_REVIEW_RESULT',
-      success: true,
-      positiveReviews,
-      negativeReviews,
-      productName: info.productName
-    }, '*');
   }
 
   // ===== 헤더 드래그 이벤트 연결 (iframe 내부 → 외부) =====
