@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "딸깍분석",
+  "version": "1.0.0",
+  "description": "페이지 분석 + 구글 검색 기반 AI 상품 분석 익스텐션",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["https://*/*", "http://*/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
