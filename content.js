@@ -83,64 +83,26 @@
       }, '*');
     }
 
-    // 리뷰 페이지 감지
+    // 리뷰 페이지 감지 → background에 요청
     if (event.data.type === 'DDALKKAK_DETECT_REVIEW_PAGE') {
-      // 페이지 컨텍스트에서 __PRELOADED_STATE__ 읽기
-      const script = document.createElement('script');
-      script.textContent = `
-        window.postMessage({
-          type: '__DDALKKAK_PAGE_INFO__',
-          preloaded: (() => {
-            try {
-              const ps = window.__PRELOADED_STATE__;
-              if (!ps) return null;
-              const s = JSON.stringify(ps);
-              const m1 = s.match(/"payReferenceKey"\\s*:\\s*"?(\\d+)"?/);
-              const m2 = s.match(/"productNo"\\s*:\\s*"?(\\d+)"?/);
-              let name = '';
-              try { name = ps.product?.A?.name || ps.productSimpleView?.A?.name || ''; } catch{}
-              return {
-                merchantNo: m1?.[1] || '',
-                productNo: m2?.[1] || '',
-                productName: name
-              };
-            } catch { return null; }
-          })()
-        }, '*');
-      `;
-      document.documentElement.appendChild(script);
-      script.remove();
-    }
-
-    // 페이지 컨텍스트에서 온 상품 정보 수신
-    if (event.data.type === '__DDALKKAK_PAGE_INFO__') {
-      const preloaded = event.data.preloaded;
-      const host = window.location.hostname;
-      const hasProduct = window.location.href.match(/products\/\d+/);
-
-      if (preloaded && preloaded.merchantNo && hasProduct) {
-        // 상품 정보 저장 (리뷰 수집에서 사용)
-        window.__ddalkkak_product_info__ = {
-          merchantNo: preloaded.merchantNo,
-          productNo: preloaded.productNo,
-          productName: preloaded.productName || document.title.replace(/ : .*$/, '').trim(),
-          isBrand: host.includes('brand.naver.com')
-        };
-
-        iframe.contentWindow.postMessage({
-          type: 'DDALKKAK_REVIEW_PAGE_INFO',
-          data: {
-            supported: true,
-            platform: host.includes('brand') ? '네이버 브랜드스토어' : '네이버 스마트스토어',
-            productName: window.__ddalkkak_product_info__.productName
-          }
-        }, '*');
-      } else {
-        iframe.contentWindow.postMessage({
-          type: 'DDALKKAK_REVIEW_PAGE_INFO',
-          data: { supported: false }
-        }, '*');
-      }
+      chrome.runtime.sendMessage({ action: 'DETECT_REVIEW_PAGE' }, (response) => {
+        if (response?.success) {
+          window.__ddalkkak_product_info__ = response.data;
+          iframe.contentWindow.postMessage({
+            type: 'DDALKKAK_REVIEW_PAGE_INFO',
+            data: {
+              supported: true,
+              platform: response.data.isBrand ? '네이버 브랜드스토어' : '네이버 스마트스토어',
+              productName: response.data.productName
+            }
+          }, '*');
+        } else {
+          iframe.contentWindow.postMessage({
+            type: 'DDALKKAK_REVIEW_PAGE_INFO',
+            data: { supported: false }
+          }, '*');
+        }
+      });
     }
 
     // 리뷰 수집 시작

@@ -14,6 +14,57 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 });
 
+// ===== 리뷰 페이지 감지 (chrome.scripting으로 __PRELOADED_STATE__ 읽기) =====
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'DETECT_REVIEW_PAGE') {
+    (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!tab || !tab.url) { sendResponse({ success: false }); return; }
+
+        const host = new URL(tab.url).hostname;
+        if (!host.includes('smartstore.naver.com') && !host.includes('brand.naver.com')) {
+          sendResponse({ success: false });
+          return;
+        }
+
+        // 페이지 컨텍스트에서 __PRELOADED_STATE__ 읽기 (CSP 우회)
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',  // 페이지의 window 객체에 접근
+          func: () => {
+            try {
+              const ps = window.__PRELOADED_STATE__;
+              if (!ps) return null;
+              const s = JSON.stringify(ps);
+              const m1 = s.match(/"payReferenceKey"\s*:\s*"?(\d+)"?/);
+              const m2 = s.match(/"productNo"\s*:\s*"?(\d+)"?/);
+              let name = '';
+              try { name = ps.product?.A?.name || ps.productSimpleView?.A?.name || ''; } catch{}
+              return {
+                merchantNo: m1?.[1] || '',
+                productNo: m2?.[1] || '',
+                productName: name || document.title.replace(/ : .*$/, '').trim()
+              };
+            } catch { return null; }
+          }
+        });
+
+        const data = results?.[0]?.result;
+        if (data && data.merchantNo && data.productNo) {
+          data.isBrand = host.includes('brand.naver.com');
+          sendResponse({ success: true, data });
+        } else {
+          sendResponse({ success: false });
+        }
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+});
+
 // ===== Gemini API 호출 공통 =====
 async function callGeminiRaw(apiKey, model, prompt, maxTokens = 256) {
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
