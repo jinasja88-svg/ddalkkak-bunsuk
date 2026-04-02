@@ -1,7 +1,7 @@
 // 딸깍분석 - Panel Script (iframe 내부에서 실행)
 
 // ===== 설정 =====
-const GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY'; // https://aistudio.google.com/apikey 에서 발급
+const GEMINI_API_KEY = 'AIzaSyDl48wpGElungLcpM5ukr6lFRHd_Dv-EJg';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const PRICE = { input: 0.15, output: 0.60 };
 const KRW_RATE = 1380;
