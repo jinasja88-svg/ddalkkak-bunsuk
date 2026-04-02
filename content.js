@@ -85,16 +85,75 @@
 
     // 리뷰 페이지 감지
     if (event.data.type === 'DDALKKAK_DETECT_REVIEW_PAGE') {
-      const info = detectReviewPage();
-      iframe.contentWindow.postMessage({
-        type: 'DDALKKAK_REVIEW_PAGE_INFO',
-        data: info
-      }, '*');
+      // 페이지 컨텍스트에서 __PRELOADED_STATE__ 읽기
+      const script = document.createElement('script');
+      script.textContent = `
+        window.postMessage({
+          type: '__DDALKKAK_PAGE_INFO__',
+          preloaded: (() => {
+            try {
+              const ps = window.__PRELOADED_STATE__;
+              if (!ps) return null;
+              const s = JSON.stringify(ps);
+              const m1 = s.match(/"payReferenceKey"\\s*:\\s*"?(\\d+)"?/);
+              const m2 = s.match(/"productNo"\\s*:\\s*"?(\\d+)"?/);
+              let name = '';
+              try { name = ps.product?.A?.name || ps.productSimpleView?.A?.name || ''; } catch{}
+              return {
+                merchantNo: m1?.[1] || '',
+                productNo: m2?.[1] || '',
+                productName: name
+              };
+            } catch { return null; }
+          })()
+        }, '*');
+      `;
+      document.documentElement.appendChild(script);
+      script.remove();
+    }
+
+    // 페이지 컨텍스트에서 온 상품 정보 수신
+    if (event.data.type === '__DDALKKAK_PAGE_INFO__') {
+      const preloaded = event.data.preloaded;
+      const host = window.location.hostname;
+      const hasProduct = window.location.href.match(/products\/\d+/);
+
+      if (preloaded && preloaded.merchantNo && hasProduct) {
+        // 상품 정보 저장 (리뷰 수집에서 사용)
+        window.__ddalkkak_product_info__ = {
+          merchantNo: preloaded.merchantNo,
+          productNo: preloaded.productNo,
+          productName: preloaded.productName || document.title.replace(/ : .*$/, '').trim(),
+          isBrand: host.includes('brand.naver.com')
+        };
+
+        iframe.contentWindow.postMessage({
+          type: 'DDALKKAK_REVIEW_PAGE_INFO',
+          data: {
+            supported: true,
+            platform: host.includes('brand') ? '네이버 브랜드스토어' : '네이버 스마트스토어',
+            productName: window.__ddalkkak_product_info__.productName
+          }
+        }, '*');
+      } else {
+        iframe.contentWindow.postMessage({
+          type: 'DDALKKAK_REVIEW_PAGE_INFO',
+          data: { supported: false }
+        }, '*');
+      }
     }
 
     // 리뷰 수집 시작
     if (event.data.type === 'DDALKKAK_COLLECT_REVIEWS') {
-      collectReviews(event.data.maxReviews || 200);
+      const info = window.__ddalkkak_product_info__;
+      if (!info) {
+        iframe.contentWindow.postMessage({
+          type: 'DDALKKAK_REVIEW_RESULT', success: false,
+          error: '상품 정보를 찾을 수 없습니다. 페이지를 새로고침 후 다시 시도해주세요.'
+        }, '*');
+        return;
+      }
+      collectReviewsWithInfo(info, event.data.maxReviews || 50);
     }
   });
 
@@ -172,87 +231,54 @@
   }
 
   // ===== 리뷰 수집: 네이버 스마트스토어/브랜드스토어 =====
-  // (기존 SMART DATA 확장프로그램 방식 그대로 적용)
-
-  // 상품 정보 가져오기 (페이지 컨텍스트에서 API 호출)
-  async function fetchPageInfo(url) {
-    const host = window.location.hostname;
-    const isBrand = host.includes('brand.naver.com');
-    const storeName = url.split('.com/')[1]?.split('/')[0] || '';
-
-    try {
-      let merchantNo, channelUid, productNo;
-
-      if (isBrand) {
-        // brand.naver.com
-        const resp = await fetch(`https://brand.naver.com/n/v1/channels?brandUrl=${storeName}`, {
-          headers: { 'accept': 'application/json, text/plain, */*', 'x-client-version': '20250625150301' },
-          credentials: 'include'
-        });
-        const data = await resp.json();
-        merchantNo = data.payReferenceKey;
-        channelUid = data.channelUid;
-      } else {
-        // smartstore.naver.com
-        const resp = await fetch(`https://smartstore.naver.com/i/v1/smart-stores?url=${storeName}`, {
-          headers: { 'accept': 'application/json, text/plain, */*', 'x-client-version': '20240729102925' },
-          credentials: 'include'
-        });
-        const data = await resp.json();
-        merchantNo = data.channel.payReferenceKey;
-        channelUid = data.channel.channelUid;
-      }
-
-      // URL에서 productNo 추출
-      const productMatch = url.match(/products\/(\d+)/);
-      productNo = productMatch ? productMatch[1] : '';
-
-      // 상품 상세 정보 (이름 등)
-      const prefix = isBrand ? 'https://brand.naver.com/n' : 'https://smartstore.naver.com/i';
-      const detailResp = await fetch(`${prefix}/v2/channels/${channelUid}/products/${productNo}?withWindow=false`, {
-        headers: { 'accept': 'application/json, text/plain, */*', 'x-client-version': '20250625150301' },
-        credentials: 'include'
-      });
-      const detail = await detailResp.json();
-
-      return {
-        supported: true,
-        platform: isBrand ? '네이버 브랜드스토어' : '네이버 스마트스토어',
-        merchantNo: String(merchantNo),
-        productNo: String(detail.productNo || productNo),
-        channelUid: String(channelUid),
-        productName: detail.name || document.title.replace(/ : .*$/, '').trim(),
-        isBrand
-      };
-    } catch (err) {
-      return { supported: false, error: err.message };
-    }
-  }
+  // window.__PRELOADED_STATE__ 에서 상품 정보 추출 + POST API로 리뷰 수집
 
   function detectReviewPage() {
     const host = window.location.hostname;
     if (host.includes('smartstore.naver.com') || host.includes('brand.naver.com')) {
       const productMatch = window.location.href.match(/products\/(\d+)/);
       if (productMatch) {
+        // __PRELOADED_STATE__에서 상품 정보 추출
+        const ps = window.__PRELOADED_STATE__;
+        let productName = document.title.replace(/ : .*$/, '').trim();
+        let merchantNo = '';
+        let productNo = '';
+
+        if (ps) {
+          const s = JSON.stringify(ps);
+          const m1 = s.match(/"payReferenceKey"\s*:\s*"?(\d+)"?/);
+          const m2 = s.match(/"productNo"\s*:\s*"?(\d+)"?/);
+          if (m1) merchantNo = m1[1];
+          if (m2) productNo = m2[1];
+
+          // 상품명
+          try {
+            if (ps.product?.A?.name) productName = ps.product.A.name;
+            else if (ps.productSimpleView?.A?.name) productName = ps.productSimpleView.A.name;
+          } catch {}
+        }
+
         return {
           supported: true,
           platform: host.includes('brand') ? '네이버 브랜드스토어' : '네이버 스마트스토어',
-          productName: document.title.replace(/ : .*$/, '').trim(),
+          productName,
+          merchantNo,
+          productNo,
+          isBrand: host.includes('brand.naver.com')
         };
       }
     }
     return { supported: false };
   }
 
-  // 리뷰 API 호출 (기존 프로그램과 동일한 POST 방식)
-  async function fetchReviewPage(apiBase, merchantNo, productNo, page, pageSize) {
-    const resp = await fetch(apiBase, {
+  // 리뷰 API 호출 (POST 방식)
+  async function fetchReviewPage(isBrand, merchantNo, productNo, page, pageSize) {
+    const prefix = isBrand ? 'https://brand.naver.com/n' : 'https://smartstore.naver.com/i';
+    const apiUrl = `${prefix}/v1/contents/reviews/query-pages`;
+
+    const resp = await fetch(apiUrl, {
       method: 'POST',
-      headers: {
-        'accept': 'application/json, text/plain, */*',
-        'content-type': 'application/json',
-        'x-client-version': '20240729102925',
-      },
+      headers: { 'accept': 'application/json', 'content-type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({
         checkoutMerchantNo: merchantNo,
@@ -267,8 +293,8 @@
     return await resp.json();
   }
 
-  // 리뷰 수집 메인
-  async function collectReviews(maxReviews) {
+  // 리뷰 수집 메인 (info는 __PRELOADED_STATE__에서 가져온 상품 정보)
+  async function collectReviewsWithInfo(info, maxReviews) {
     const sendProgress = (text, pct) => {
       iframe.contentWindow.postMessage({ type: 'DDALKKAK_REVIEW_PROGRESS', percent: pct, text }, '*');
     };
@@ -276,44 +302,26 @@
       iframe.contentWindow.postMessage({ type: 'DDALKKAK_REVIEW_RESULT', success: false, error }, '*');
     };
 
-    sendProgress('상품 정보 확인 중', 2);
-
-    // 1단계: 상품 정보 가져오기
-    const info = await fetchPageInfo(window.location.href);
-    if (!info.supported) {
-      sendError(info.error || '상품 정보를 찾을 수 없습니다.');
-      return;
-    }
-
-    // API 베이스 URL
-    const prefix = info.isBrand ? 'https://brand.naver.com/n' : 'https://smartstore.naver.com/i';
-    const apiBase = `${prefix}/v1/contents/reviews/query-pages`;
     const pageSize = 30;
+    let allReviews = [];
 
     sendProgress('리뷰 수집 중', 5);
 
-    // 2단계: 전체 리뷰 수집 (별점 포함)
-    let allReviews = [];
-    let page = 1;
-    let totalPages = 1;
-
     try {
-      // 첫 페이지로 총 페이지 수 확인
-      const first = await fetchReviewPage(apiBase, info.merchantNo, info.productNo, 1, pageSize);
-      totalPages = first.totalPages || 1;
+      const first = await fetchReviewPage(info.isBrand, info.merchantNo, info.productNo, 1, pageSize);
+      const totalPages = first.totalPages || 1;
 
       for (const r of first.contents || []) {
         allReviews.push({ score: r.reviewScore, text: (r.reviewContent || '').trim() });
       }
 
-      // 나머지 페이지 수집 (최대한 수집하되 50개씩이면 충분)
       const maxPages = Math.min(totalPages, Math.ceil((maxReviews * 2) / pageSize) + 2);
 
-      for (page = 2; page <= maxPages; page++) {
-        await new Promise(r => setTimeout(r, 300)); // 딜레이
+      for (let page = 2; page <= maxPages; page++) {
+        await new Promise(r => setTimeout(r, 300));
 
         try {
-          const data = await fetchReviewPage(apiBase, info.merchantNo, info.productNo, page, pageSize);
+          const data = await fetchReviewPage(info.isBrand, info.merchantNo, info.productNo, page, pageSize);
           if (!data.contents || data.contents.length === 0) break;
 
           for (const r of data.contents) {
@@ -321,15 +329,13 @@
           }
         } catch { break; }
 
-        const pct = 5 + (page / maxPages) * 60;
-        sendProgress(`리뷰 수집 중 (${allReviews.length}개)`, pct);
+        sendProgress(`리뷰 수집 중 (${allReviews.length}개)`, 5 + (page / maxPages) * 60);
       }
     } catch (err) {
-      sendError(`리뷰 API 호출 실패: ${err.message}`);
+      sendError(`리뷰 수집 실패: ${err.message}`);
       return;
     }
 
-    // 3단계: 별점별 분류
     const positiveReviews = allReviews
       .filter(r => r.score === 5 && r.text.length > 5)
       .map(r => r.text)
