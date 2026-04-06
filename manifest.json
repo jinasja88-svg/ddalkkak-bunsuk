@@ -1,9 +1,14 @@
 {
   "manifest_version": 3,
   "name": "딸깍분석",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "페이지 분석 + 검색 기반 AI 상품 분석 익스텐션",
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "tabs"],
+  "content_scripts": [{
+    "js": ["coupWing.js"],
+    "matches": ["https://wing.coupang.com/*"],
+    "run_at": "document_end"
+  }],
   "host_permissions": ["https://*/*", "http://*/*"],
   "action": {
     "default_icon": {

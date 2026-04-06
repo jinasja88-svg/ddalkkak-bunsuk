@@ -22,41 +22,163 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab || !tab.url) { sendResponse({ success: false }); return; }
 
-        const host = new URL(tab.url).hostname;
-        if (!host.includes('smartstore.naver.com') && !host.includes('brand.naver.com')) {
-          sendResponse({ success: false });
+        const url = new URL(tab.url);
+        const host = url.hostname;
+
+        // ===== 네이버 스마트스토어/브랜드스토어 =====
+        if (host.includes('smartstore.naver.com') || host.includes('brand.naver.com')) {
+          const results = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            world: 'MAIN',
+            func: () => {
+              try {
+                const ps = window.__PRELOADED_STATE__;
+                if (!ps) return null;
+                const s = JSON.stringify(ps);
+                const m1 = s.match(/"payReferenceKey"\s*:\s*"?(\d+)"?/);
+                const m2 = s.match(/"productNo"\s*:\s*"?(\d+)"?/);
+                let name = '';
+                try { name = ps.product?.A?.name || ps.productSimpleView?.A?.name || ''; } catch{}
+                return {
+                  merchantNo: m1?.[1] || '',
+                  productNo: m2?.[1] || '',
+                  productName: name || document.title.replace(/ : .*$/, '').trim()
+                };
+              } catch { return null; }
+            }
+          });
+
+          const data = results?.[0]?.result;
+          if (data && data.merchantNo && data.productNo) {
+            data.platform = 'naver';
+            data.isBrand = host.includes('brand.naver.com');
+            sendResponse({ success: true, data });
+          } else {
+            sendResponse({ success: false });
+          }
           return;
         }
 
-        // 페이지 컨텍스트에서 __PRELOADED_STATE__ 읽기 (CSP 우회)
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: 'MAIN',  // 페이지의 window 객체에 접근
-          func: () => {
-            try {
-              const ps = window.__PRELOADED_STATE__;
-              if (!ps) return null;
-              const s = JSON.stringify(ps);
-              const m1 = s.match(/"payReferenceKey"\s*:\s*"?(\d+)"?/);
-              const m2 = s.match(/"productNo"\s*:\s*"?(\d+)"?/);
-              let name = '';
-              try { name = ps.product?.A?.name || ps.productSimpleView?.A?.name || ''; } catch{}
-              return {
-                merchantNo: m1?.[1] || '',
-                productNo: m2?.[1] || '',
-                productName: name || document.title.replace(/ : .*$/, '').trim()
-              };
-            } catch { return null; }
-          }
+        // ===== 쿠팡 =====
+        if (host.includes('coupang.com')) {
+          const productMatch = url.pathname.match(/\/products\/(\d+)/);
+          if (!productMatch) { sendResponse({ success: false }); return; }
+
+          const productId = productMatch[1];
+          const itemId = url.searchParams.get('itemId') || '';
+          const vendorItemId = url.searchParams.get('vendorItemId') || '';
+
+          const results = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => {
+              const og = document.querySelector('meta[property="og:title"]');
+              return og?.content || document.title.replace(/\s*\|.*$/, '').trim();
+            }
+          });
+
+          const productName = results?.[0]?.result || '';
+          sendResponse({
+            success: true,
+            data: { platform: 'coupang', productName, productId, itemId, vendorItemId }
+          });
+          return;
+        }
+
+        sendResponse({ success: false });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+});
+
+// ===== 쿠팡윙 조회수 (28일) =====
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'WING_LOGIN') {
+    const productId = request.productId;
+    const originalTabId = sender.tab.id;
+
+    chrome.tabs.create({ url: 'https://wing.coupang.com/', active: true }, (newTab) => {
+      const wingTabId = newTab.id;
+      const wingPattern = /^https:\/\/wing\.coupang\.com\/.*$/;
+
+      const listener = (updatedTabId, changeInfo, tab) => {
+        if (updatedTabId !== wingTabId || changeInfo.status !== 'complete' || !wingPattern.test(tab.url)) return;
+
+        chrome.tabs.sendMessage(wingTabId, { type: 'wingInfo', keyword: productId }, (response) => {
+          if (chrome.runtime.lastError || !response) return;
+
+          chrome.tabs.sendMessage(originalTabId, {
+            type: 'DDALKKAK_WING_RESULT',
+            success: response.success,
+            data: response.data
+          });
+
+          chrome.tabs.remove(wingTabId, () => {
+            chrome.tabs.update(originalTabId, { active: true });
+          });
+          chrome.tabs.onUpdated.removeListener(listener);
+        });
+      };
+
+      chrome.tabs.onUpdated.addListener(listener);
+
+      // 2분 타임아웃
+      setTimeout(() => {
+        chrome.tabs.onUpdated.removeListener(listener);
+      }, 120000);
+    });
+
+    sendResponse({ success: true });
+    return true;
+  }
+});
+
+// ===== 네이버 구매/재구매 수 조회 =====
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'NAVER_PURCHASE_INFO') {
+    (async () => {
+      try {
+        const { productNo, isBrand, basisPurchased, basisRepurchased } = request;
+        const prefix = isBrand ? 'https://brand.naver.com/n' : 'https://smartstore.naver.com/i';
+        const baseUrl = `${prefix}/v1/marketing-message/${productNo}`;
+
+        // 구매 수 조회
+        const purchaseParams = new URLSearchParams({
+          currentPurchaseType: 'Paid',
+          usePurchased: 'true',
+          basisPurchased: basisPurchased || 10,
+          usePurchasedIn2Y: 'true',
+          useRepurchased: 'true',
+          basisRepurchased: basisRepurchased || 10
         });
 
-        const data = results?.[0]?.result;
-        if (data && data.merchantNo && data.productNo) {
-          data.isBrand = host.includes('brand.naver.com');
-          sendResponse({ success: true, data });
-        } else {
-          sendResponse({ success: false });
-        }
+        const resp = await fetch(`${baseUrl}?${purchaseParams}`, {
+          headers: { 'accept': 'application/json, text/plain, */*' }
+        });
+
+        if (!resp.ok) { sendResponse({ success: false }); return; }
+        const data = await resp.json();
+
+        // 재구매 수 조회
+        const repurchaseParams = new URLSearchParams({
+          currentPurchaseType: 'Repaid',
+          usePurchased: 'true',
+          basisPurchased: basisPurchased || 10,
+          usePurchasedIn2Y: 'true',
+          useRepurchased: 'true',
+          basisRepurchased: basisRepurchased || 10
+        });
+
+        const resp2 = await fetch(`${baseUrl}?${repurchaseParams}`, {
+          headers: { 'accept': 'application/json, text/plain, */*' }
+        });
+
+        let repurchaseData = null;
+        if (resp2.ok) repurchaseData = await resp2.json();
+
+        sendResponse({ success: true, purchase: data, repurchase: repurchaseData });
       } catch (err) {
         sendResponse({ success: false, error: err.message });
       }

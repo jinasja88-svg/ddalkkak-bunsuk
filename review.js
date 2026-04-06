@@ -52,7 +52,7 @@
         reviewInfo.innerHTML = `<span class="supported">지원: ${info.platform}</span><br>상품: ${info.productName || '감지됨'}`;
         reviewBtn.disabled = false;
       } else {
-        reviewInfo.innerHTML = `<span class="unsupported">이 페이지는 리뷰 수집을 지원하지 않습니다.</span><br>지원: 네이버 스마트스토어, 브랜드스토어`;
+        reviewInfo.innerHTML = `<span class="unsupported">이 페이지는 리뷰 수집을 지원하지 않습니다.</span><br>지원: 네이버 스마트스토어, 브랜드스토어, 쿠팡`;
         reviewBtn.disabled = true;
       }
     }

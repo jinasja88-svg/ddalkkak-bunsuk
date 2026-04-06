@@ -7,8 +7,8 @@ const PRICE = { input: 0.15, output: 0.60 };
 const KRW_RATE = 1380;
 
 // ===== 상태 =====
-let currentMode = 'turbo';
 let analysisResult = '';
+let coupangProductId = null;
 
 // ===== UI 요소 =====
 const analyzeBtn = document.getElementById('analyzeBtn');
@@ -34,13 +34,77 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// ===== 모드 토글 =====
-document.querySelectorAll('.mode-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentMode = btn.dataset.mode;
-  });
+// ===== 쿠팡 조회수 + 네이버 구매/재구매 =====
+const viewCountInfo = document.getElementById('viewCountInfo');
+const wingLoginBtn = document.getElementById('wingLoginBtn');
+const viewCountValue = document.getElementById('viewCountValue');
+const naverPurchaseInfo = document.getElementById('naverPurchaseInfo');
+const naverPurchaseText = document.getElementById('naverPurchaseText');
+
+window.parent.postMessage({ type: 'DDALKKAK_GET_PAGE_INFO' }, '*');
+
+window.addEventListener('message', (event) => {
+  // 페이지 감지 결과
+  if (event.data?.type === 'DDALKKAK_PAGE_INFO_RESULT') {
+    if (event.data.isCoupang && event.data.productId) {
+      coupangProductId = event.data.productId;
+      viewCountInfo.className = 'view-count-info show';
+    }
+    if (event.data.isNaver) {
+      naverPurchaseInfo.className = 'view-count-info show';
+      // DETECT_REVIEW_PAGE로 productNo 가져오기
+      chrome.runtime.sendMessage({ action: 'DETECT_REVIEW_PAGE' }, (response) => {
+        if (response?.success && response.data?.productNo) {
+          window.parent.postMessage({
+            type: 'DDALKKAK_NAVER_PURCHASE',
+            productNo: response.data.productNo,
+            isBrand: response.data.isBrand || false,
+            basisPurchased: 10,
+            basisRepurchased: 10
+          }, '*');
+        } else {
+          naverPurchaseText.textContent = '구매 정보를 가져올 수 없습니다';
+        }
+      });
+    }
+  }
+
+  // 쿠팡윙 결과
+  if (event.data?.type === 'DDALKKAK_WING_RESULT') {
+    if (event.data.success && event.data.data?.viewCount != null) {
+      wingLoginBtn.style.display = 'none';
+      viewCountValue.textContent = Number(event.data.data.viewCount).toLocaleString();
+    } else {
+      wingLoginBtn.textContent = '조회 실패 (재시도)';
+    }
+  }
+
+  // 네이버 구매/재구매 결과
+  if (event.data?.type === 'DDALKKAK_NAVER_PURCHASE_RESULT') {
+    if (event.data.success) {
+      const p = event.data.purchase;
+      const r = event.data.repurchase;
+      let text = '';
+      if (p && p.mainPhrase) {
+        text += `${p.prefix || ''}${p.mainPhrase}${p.suffix || ''}`;
+      } else {
+        text += '구매 정보 없음';
+      }
+      if (r && r.mainPhrase) {
+        text += ` / ${r.prefix || ''}${r.mainPhrase}${r.suffix || ''}`;
+      }
+      naverPurchaseText.textContent = text || '구매 정보 없음';
+    } else {
+      naverPurchaseText.textContent = '구매 정보를 가져올 수 없습니다';
+    }
+  }
+});
+
+wingLoginBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  if (!coupangProductId) return;
+  wingLoginBtn.textContent = '로그인 대기 중...';
+  window.parent.postMessage({ type: 'DDALKKAK_WING_LOGIN', productId: coupangProductId }, '*');
 });
 
 // ===== 복사 버튼 =====
@@ -148,11 +212,8 @@ analyzeBtn.addEventListener('click', async () => {
   const userPrompt = promptEl.value.trim() || '이 사이트의 제품을 아주 상세하게 강점, 단점, 스펙 등 분석해서 알려줘';
 
   try {
-    const isTurbo = currentMode === 'turbo';
-    const steps = isTurbo ? 4 : 2;
-
     // Step 1: DOM 추출
-    updateStatus(1, steps);
+    updateStatus(1, 4);
     window.parent.postMessage({ type: 'DDALKKAK_EXTRACT_DOM' }, '*');
 
     const domData = await new Promise((resolve, reject) => {
@@ -167,24 +228,21 @@ analyzeBtn.addEventListener('click', async () => {
       setTimeout(() => { window.removeEventListener('message', handler); reject(new Error('페이지 응답 시간 초과')); }, 10000);
     });
 
-    // Step 2~3: 검색 (터보 모드)
-    let searchResults = [];
-    if (isTurbo) {
-      updateStatus(2, steps);
-      const pageTitle = domData.meta.ogTitle || domData.meta.title || '';
-      const queryResp = await sendToBackground({
-        action: 'GENERATE_SEARCH_QUERY', apiKey: GEMINI_API_KEY, model: GEMINI_MODEL,
-        pageTitle, userMessage: userPrompt
-      });
-      const searchQuery = queryResp?.query || pageTitle.substring(0, 40);
+    // Step 2~3: 검색
+    updateStatus(2, 4);
+    const pageTitle = domData.meta.ogTitle || domData.meta.title || '';
+    const queryResp = await sendToBackground({
+      action: 'GENERATE_SEARCH_QUERY', apiKey: GEMINI_API_KEY, model: GEMINI_MODEL,
+      pageTitle, userMessage: userPrompt
+    });
+    const searchQuery = queryResp?.query || pageTitle.substring(0, 40);
 
-      updateStatus(3, steps);
-      const searchResp = await sendToBackground({ action: 'SEARCH_AND_FETCH', query: searchQuery, fetchPages: true });
-      searchResults = searchResp?.results || [];
-    }
+    updateStatus(3, 4);
+    const searchResp = await sendToBackground({ action: 'SEARCH_AND_FETCH', query: searchQuery, fetchPages: true });
+    const searchResults = searchResp?.results || [];
 
-    // Step 마지막: Gemini 분석
-    updateStatus(isTurbo ? 4 : 2, steps);
+    // Step 4: Gemini 분석
+    updateStatus(4, 4);
     const prompt = buildPrompt(userPrompt, domData, searchResults);
     const resp = await sendToBackground({ action: 'CALL_GEMINI', prompt, apiKey: GEMINI_API_KEY, model: GEMINI_MODEL });
     if (!resp?.success) throw new Error(resp?.error || 'AI 분석에 실패했습니다');

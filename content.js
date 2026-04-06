@@ -73,6 +73,52 @@
       wrapper.style.display = 'none';
     }
 
+    // 페이지 정보 요청 (쿠팡/네이버 감지)
+    if (event.data.type === 'DDALKKAK_GET_PAGE_INFO') {
+      const url = window.location.href;
+      const host = window.location.hostname;
+      const isCoupang = url.includes('coupang.com/vp/products/');
+      const isNaver = host.includes('smartstore.naver.com') || host.includes('brand.naver.com');
+      let productId = null;
+      if (isCoupang) {
+        const match = url.match(/\/products\/(\d+)/);
+        productId = match ? match[1] : null;
+      }
+      iframe.contentWindow.postMessage({
+        type: 'DDALKKAK_PAGE_INFO_RESULT',
+        isCoupang,
+        isNaver,
+        isBrand: host.includes('brand.naver.com'),
+        productId
+      }, '*');
+    }
+
+    // 네이버 구매/재구매 조회 요청
+    if (event.data.type === 'DDALKKAK_NAVER_PURCHASE') {
+      chrome.runtime.sendMessage({
+        action: 'NAVER_PURCHASE_INFO',
+        productNo: event.data.productNo,
+        isBrand: event.data.isBrand,
+        basisPurchased: event.data.basisPurchased,
+        basisRepurchased: event.data.basisRepurchased
+      }, (response) => {
+        iframe.contentWindow.postMessage({
+          type: 'DDALKKAK_NAVER_PURCHASE_RESULT',
+          success: response?.success,
+          purchase: response?.purchase,
+          repurchase: response?.repurchase
+        }, '*');
+      });
+    }
+
+    // 쿠팡윙 로그인 요청
+    if (event.data.type === 'DDALKKAK_WING_LOGIN') {
+      chrome.runtime.sendMessage({
+        action: 'WING_LOGIN',
+        productId: event.data.productId
+      });
+    }
+
     // DOM 추출 요청
     if (event.data.type === 'DDALKKAK_EXTRACT_DOM') {
       const data = extractPageDOM();
@@ -88,11 +134,15 @@
       chrome.runtime.sendMessage({ action: 'DETECT_REVIEW_PAGE' }, (response) => {
         if (response?.success) {
           window.__ddalkkak_product_info__ = response.data;
+          let platformName = '쿠팡';
+          if (response.data.platform === 'naver') {
+            platformName = response.data.isBrand ? '네이버 브랜드스토어' : '네이버 스마트스토어';
+          }
           iframe.contentWindow.postMessage({
             type: 'DDALKKAK_REVIEW_PAGE_INFO',
             data: {
               supported: true,
-              platform: response.data.isBrand ? '네이버 브랜드스토어' : '네이버 스마트스토어',
+              platform: platformName,
               productName: response.data.productName
             }
           }, '*');
@@ -190,6 +240,74 @@
       charCount: cleanText.length,
       url: window.location.href
     };
+  }
+
+  // ===== 쿠팡 리뷰 수집 =====
+
+  async function fetchCoupangReviewPage(productId, itemId, vendorItemId, rating, page, pageSize) {
+    const url = `https://www.coupang.com/vp/product/reviews?productId=${productId}&page=${page}&size=${pageSize}&sortBy=ORDER_SCORE_ASC&ratings=${rating}&itemId=${itemId}&vendorItemId=${vendorItemId}&q=&viRoleCode=3&ratingSummary=true`;
+
+    const resp = await fetch(url, {
+      headers: {
+        'Accept': 'text/html, */*; q=0.01',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Referer': window.location.href
+      },
+      credentials: 'include'
+    });
+
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.text();
+  }
+
+  function parseCoupangReviews(html) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const reviews = [];
+
+    // 리뷰 본문 텍스트 추출
+    const textEls = doc.querySelectorAll('.sdp-review__article__list__review__content .sdp-review__article__list__review__content__text');
+    for (const el of textEls) {
+      const text = el.textContent?.trim();
+      if (text && text.length > 5) reviews.push(text);
+    }
+
+    // 폴백: 다른 셀렉터
+    if (reviews.length === 0) {
+      const articles = doc.querySelectorAll('.sdp-review__article__list__review');
+      for (const el of articles) {
+        const contentEl = el.querySelector('[class*="content__text"]') || el.querySelector('[class*="__content"]');
+        const text = contentEl?.textContent?.trim();
+        if (text && text.length > 5) reviews.push(text);
+      }
+    }
+
+    return reviews;
+  }
+
+  async function collectCoupangByRating(info, rating, maxCount, onProgress) {
+    const reviews = [];
+    const pageSize = 20;
+
+    for (let page = 1; reviews.length < maxCount; page++) {
+      try {
+        if (page > 1) await new Promise(r => setTimeout(r, 500));
+        const html = await fetchCoupangReviewPage(info.productId, info.itemId, info.vendorItemId, rating, page, pageSize);
+        const pageReviews = parseCoupangReviews(html);
+
+        if (pageReviews.length === 0) break;
+
+        for (const r of pageReviews) {
+          reviews.push(r);
+          if (reviews.length >= maxCount) break;
+        }
+
+        if (onProgress) onProgress(reviews.length, maxCount);
+        if (pageReviews.length < pageSize) break;
+      } catch { break; }
+    }
+
+    return reviews;
   }
 
   // ===== 리뷰 수집: 네이버 스마트스토어/브랜드스토어 =====
@@ -305,19 +423,22 @@
     };
 
     try {
+      const isCoupang = info.platform === 'coupang';
+      const collectFn = isCoupang ? collectCoupangByRating : collectByScore;
+
       // 1점 리뷰 수집
       sendProgress('1점 리뷰 수집 중', 5);
-      const reviews1 = await collectByScore(info, 1, maxReviews,
+      const reviews1 = await collectFn(info, 1, maxReviews,
         (got, total) => sendProgress(`1점 리뷰 수집 중 (${got}개)`, 5 + (got / maxReviews) * 10));
 
       // 2점 리뷰 수집
       sendProgress('2점 리뷰 수집 중', 20);
-      const reviews2 = await collectByScore(info, 2, maxReviews - reviews1.length,
+      const reviews2 = await collectFn(info, 2, maxReviews - reviews1.length,
         (got, total) => sendProgress(`2점 리뷰 수집 중 (${got}개)`, 20 + (got / maxReviews) * 10));
 
       // 5점 리뷰 수집
       sendProgress('5점 리뷰 수집 중', 40);
-      const reviews5 = await collectByScore(info, 5, maxReviews,
+      const reviews5 = await collectFn(info, 5, maxReviews,
         (got, total) => sendProgress(`5점 리뷰 수집 중 (${got}개)`, 40 + (got / maxReviews) * 25));
 
       const negativeReviews = [...reviews1, ...reviews2].slice(0, maxReviews);
@@ -337,6 +458,17 @@
       sendError(`리뷰 수집 실패: ${err.message}`);
     }
   }
+
+  // ===== 쿠팡윙 조회수 결과 수신 (background → content → panel) =====
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'DDALKKAK_WING_RESULT') {
+      iframe.contentWindow.postMessage({
+        type: 'DDALKKAK_WING_RESULT',
+        success: message.success,
+        data: message.data
+      }, '*');
+    }
+  });
 
   // ===== 헤더 드래그 이벤트 연결 (iframe 내부 → 외부) =====
   iframe.addEventListener('load', () => {

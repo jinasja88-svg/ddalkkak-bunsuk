@@ -150,25 +150,24 @@
     }
     .custom-prompt textarea:focus { outline: none; border-color: #667eea; }
 
-    .mode-toggle {
-      padding: 6px 12px;
-      display: flex;
-      gap: 6px;
+    .view-count-info {
+      padding: 12px 12px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #b0b0d0;
       border-bottom: 1px solid #2a2a4a;
+      display: none;
     }
-    .mode-btn {
-      padding: 4px 10px;
-      border-radius: 20px;
-      border: 1px solid #3a3a5a;
-      background: transparent;
-      color: #8888aa;
-      font-size: 11px;
+    .view-count-info.show { display: block; }
+    .view-count-info .wing-login-link {
+      color: #667eea;
       cursor: pointer;
+      text-decoration: underline;
     }
-    .mode-btn.active {
-      background: #667eea;
-      color: #fff;
-      border-color: #667eea;
+    .view-count-info .wing-login-link:hover { color: #a5b4fc; }
+    .view-count-info .view-count-value {
+      color: #4ade80;
+      font-weight: 600;
     }
 
     .loading-dots::after {
@@ -229,16 +228,18 @@
 
   <!-- 탭 1: 상품 분석 (기존) -->
   <div class="tab-content active" id="tab-analyze">
-    <div class="mode-toggle">
-      <button class="mode-btn" data-mode="off">기본 (DOM만)</button>
-      <button class="mode-btn active" data-mode="turbo">터보 (검색+)</button>
-    </div>
     <div class="custom-prompt">
       <textarea id="userPrompt" placeholder="분석 요청을 입력하세요 (비우면 기본 분석)">이 사이트의 제품을 아주 상세하게 강점, 단점, 스펙 등 분석해서 알려줘</textarea>
     </div>
     <div class="controls">
       <button class="btn btn-primary" id="analyzeBtn">🖱️ 딸깍 분석하기</button>
       <button class="btn btn-secondary" id="copyBtn" style="flex:0.4" disabled>복사</button>
+    </div>
+    <div class="view-count-info" id="viewCountInfo">
+      조회수(28일): <a id="wingLoginBtn" class="wing-login-link">쿠팡 로그인</a><span id="viewCountValue" class="view-count-value"></span>
+    </div>
+    <div class="view-count-info" id="naverPurchaseInfo">
+      <span id="naverPurchaseText">구매/재구매 정보 조회 중...</span>
     </div>
     <div class="status" id="status"></div>
     <div class="token-info" id="tokenInfo"></div>
