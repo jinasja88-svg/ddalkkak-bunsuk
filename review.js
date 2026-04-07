@@ -107,13 +107,48 @@
 
     showProgress(0, '리뷰 수집 준비 중');
 
-    // content script에 리뷰 수집 요청
     window.parent.postMessage({
       type: 'DDALKKAK_COLLECT_REVIEWS',
       maxReviews: MAX_REVIEWS,
       pageSize: PAGE_SIZE
     }, '*');
   });
+
+  // ===== 프롬프트 생성 =====
+  function buildPrompt(productName, sampledPositive, sampledNegative, totalPos, totalNeg) {
+    let prompt = `## 역할\n당신은 소비자 리뷰 분석 전문가입니다. 실제 구매자 리뷰를 기반으로 장점과 단점을 정리해주세요.\n\n`;
+    prompt += `## 상품명\n${productName}\n\n`;
+    prompt += `## 5점 리뷰 (장점, 전체 ${totalPos}개 중 ${sampledPositive.length}개 샘플)\n`;
+    for (const r of sampledPositive) prompt += `- ${r}\n`;
+    prompt += `\n## 1~2점 리뷰 (단점, 전체 ${totalNeg}개 중 ${sampledNegative.length}개 샘플)\n`;
+    for (const r of sampledNegative) prompt += `- ${r}\n`;
+    prompt += `\n## 분석 요청\n`;
+    prompt += `위 리뷰들을 분석해서 다음 형식으로 정리해주세요:\n\n`;
+    prompt += `### 장점 요약 (5점 리뷰 기반)\n`;
+    prompt += `- 가장 많이 언급된 장점들을 빈도순으로 정리\n`;
+    prompt += `- 각 장점에 대표 리뷰 원문 1~2개 인용\n\n`;
+    prompt += `### 단점 요약 (1~2점 리뷰 기반)\n`;
+    prompt += `- 가장 많이 언급된 불만/단점을 빈도순으로 정리하되, 1위 단점 제목에 (최다 불만) 태그를 붙여주세요\n`;
+    prompt += `- 각 단점에 대표 리뷰 원문 1~2개 인용\n`;
+    prompt += `- 특히 심각한 문제(불량, 안전, 위생 등)는 별도 경고로 표시\n\n`;
+    prompt += `### 구매 판단 요약\n`;
+    prompt += `- 이 제품을 사야 하는 사람 / 사면 안 되는 사람\n`;
+    prompt += `- 한줄 총평\n`;
+    return prompt;
+  }
+
+  // ===== Gemini 호출 =====
+  function callGemini(prompt, model) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { action: 'CALL_GEMINI', prompt, apiKey: GEMINI_API_KEY, model },
+        (response) => {
+          if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+          else resolve(response);
+        }
+      );
+    });
+  }
 
   // ===== 리뷰 수집 완료 → AI 분석 =====
   async function handleReviewResult(data) {
@@ -125,51 +160,14 @@
     }
 
     const { positiveReviews, negativeReviews, productName } = data;
+    const sampledPositive = sampleByLength(positiveReviews);
+    const sampledNegative = sampleByLength(negativeReviews);
+    const prompt = buildPrompt(productName, sampledPositive, sampledNegative, positiveReviews.length, negativeReviews.length);
 
     showProgress(70, 'AI 분석 중');
 
-    // 길이별 샘플링 (긴15 + 중간15 + 짧은15)
-    const sampledPositive = sampleByLength(positiveReviews);
-    const sampledNegative = sampleByLength(negativeReviews);
-
-    // 프롬프트 조합
-    let prompt = `## 역할\n당신은 소비자 리뷰 분석 전문가입니다. 실제 구매자 리뷰를 기반으로 장점과 단점을 정리해주세요.\n\n`;
-    prompt += `## 상품명\n${productName}\n\n`;
-
-    prompt += `## 5점 리뷰 (장점, 전체 ${positiveReviews.length}개 중 ${sampledPositive.length}개 샘플)\n`;
-    for (const r of sampledPositive) {
-      prompt += `- ${r}\n`;
-    }
-
-    prompt += `\n## 1~2점 리뷰 (단점, 전체 ${negativeReviews.length}개 중 ${sampledNegative.length}개 샘플)\n`;
-    for (const r of sampledNegative) {
-      prompt += `- ${r}\n`;
-    }
-
-    prompt += `\n## 분석 요청\n`;
-    prompt += `위 리뷰들을 분석해서 다음 형식으로 정리해주세요:\n\n`;
-    prompt += `### 장점 요약 (5점 리뷰 기반)\n`;
-    prompt += `- 가장 많이 언급된 장점들을 빈도순으로 정리\n`;
-    prompt += `- 각 장점에 대표 리뷰 원문 1~2개 인용\n\n`;
-    prompt += `### 단점 요약 (1~2점 리뷰 기반)\n`;
-    prompt += `- 가장 많이 언급된 불만/단점을 빈도순으로 정리\n`;
-    prompt += `- 각 단점에 대표 리뷰 원문 1~2개 인용\n`;
-    prompt += `- 특히 심각한 문제(불량, 안전, 위생 등)는 별도 경고로 표시\n\n`;
-    prompt += `### 구매 판단 요약\n`;
-    prompt += `- 이 제품을 사야 하는 사람 / 사면 안 되는 사람\n`;
-    prompt += `- 한줄 총평\n`;
-
     try {
-      const resp = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          { action: 'CALL_GEMINI', prompt, apiKey: GEMINI_API_KEY, model: GEMINI_MODEL },
-          (response) => {
-            if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-            else resolve(response);
-          }
-        );
-      });
-
+      const resp = await callGemini(prompt, GEMINI_MODEL);
       if (!resp?.success) throw new Error(resp?.error || 'AI 분석 실패');
 
       hideProgress();
@@ -177,22 +175,16 @@
       reviewResult.innerHTML = markdownToHtml(resp.text);
       reviewCopyBtn.disabled = false;
 
-      // 토큰 정보
-      const usage = resp.usage;
-      const inputCost = usage.inputTokens / 1e6 * PRICE.input;
-      const outputCost = usage.outputTokens / 1e6 * PRICE.output;
-      const totalCost = inputCost + outputCost;
       reviewTokenInfo.className = 'token-info show';
       reviewTokenInfo.innerHTML = `
         <span>5점: ${positiveReviews.length}개 수집 → ${sampledPositive.length}개 분석</span>
         <span>1~2점: ${negativeReviews.length}개 수집 → ${sampledNegative.length}개 분석</span>
-        <span class="cost">비용: $${totalCost.toFixed(6)} (약 ${(totalCost * KRW_RATE).toFixed(1)}원)</span>
       `;
     } catch (err) {
       showReviewError(err.message);
-    } finally {
-      reviewBtn.disabled = false;
-      reviewBtn.textContent = '리뷰 수집 & 분석';
     }
+
+    reviewBtn.disabled = false;
+    reviewBtn.textContent = '리뷰 수집 & 분석';
   }
 })();

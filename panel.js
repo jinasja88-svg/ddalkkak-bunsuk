@@ -2,9 +2,7 @@
 
 // ===== 설정 (API 키는 config.js에서 로드) =====
 // GEMINI_API_KEY는 config.js에서 정의됨
-const GEMINI_MODEL = 'gemini-2.5-flash';
-const PRICE = { input: 0.15, output: 0.60 };
-const KRW_RATE = 1380;
+const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 
 // ===== 상태 =====
 let analysisResult = '';
@@ -131,17 +129,12 @@ function clearStatus() {
   statusEl.innerHTML = '';
 }
 
-// ===== 토큰 비용 =====
+// ===== 토큰 정보 =====
 function showTokenInfo(usage) {
-  const inputCost = usage.inputTokens / 1e6 * PRICE.input;
-  const outputCost = usage.outputTokens / 1e6 * PRICE.output;
-  const totalCost = inputCost + outputCost;
-  const krw = totalCost * KRW_RATE;
   tokenInfoEl.className = 'token-info show';
   tokenInfoEl.innerHTML = `
     <span>입력: ${usage.inputTokens.toLocaleString()}t</span>
     <span>출력: ${usage.outputTokens.toLocaleString()}t</span>
-    <span class="cost">비용: $${totalCost.toFixed(6)} (약 ${krw.toFixed(1)}원)</span>
   `;
 }
 

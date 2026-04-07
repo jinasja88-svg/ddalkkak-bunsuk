@@ -25,6 +25,14 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Period"
+      },
+      "description": "딸깍분석 열기/닫기"
+    }
+  },
   "web_accessible_resources": [{
     "resources": ["panel.html", "config.js", "panel.js", "review.js"],
     "matches": ["https://*/*", "http://*/*"]
