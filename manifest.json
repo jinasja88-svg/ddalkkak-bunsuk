@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "딸깍분석",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "페이지 분석 + 검색 기반 AI 상품 분석 익스텐션",
   "permissions": ["activeTab", "scripting", "tabs"],
   "content_scripts": [{
