@@ -2,8 +2,25 @@
 // 네이버 스마트스토어/브랜드스토어 리뷰 수집 + AI 분석
 
 (() => {
-  const MAX_REVIEWS = 200; // 장점/단점 각각 최대 200개
+  const MAX_REVIEWS = 200; // 장점/단점 각각 최대 200개 수집
+  const AI_SAMPLE = 45;   // AI 전송용: 긴15 + 중간15 + 짧은15
   const PAGE_SIZE = 20;
+
+  // 리뷰를 길이순 정렬 후 긴15 + 중간15 + 짧은15 선별
+  function sampleByLength(reviews, count = 15) {
+    if (reviews.length <= count * 3) return reviews;
+    const sorted = [...reviews].sort((a, b) => b.length - a.length);
+    const long = sorted.slice(0, count);
+    const short = sorted.slice(-count);
+    const mid = sorted.slice(Math.floor(sorted.length / 2 - count / 2), Math.floor(sorted.length / 2 + count / 2 + 0.5));
+    // 중복 제거
+    const seen = new Set();
+    const result = [];
+    for (const r of [...long, ...mid, ...short]) {
+      if (!seen.has(r)) { seen.add(r); result.push(r); }
+    }
+    return result;
+  }
 
   // UI 요소
   const reviewBtn = document.getElementById('reviewBtn');
@@ -111,17 +128,21 @@
 
     showProgress(70, 'AI 분석 중');
 
+    // 길이별 샘플링 (긴15 + 중간15 + 짧은15)
+    const sampledPositive = sampleByLength(positiveReviews);
+    const sampledNegative = sampleByLength(negativeReviews);
+
     // 프롬프트 조합
     let prompt = `## 역할\n당신은 소비자 리뷰 분석 전문가입니다. 실제 구매자 리뷰를 기반으로 장점과 단점을 정리해주세요.\n\n`;
     prompt += `## 상품명\n${productName}\n\n`;
 
-    prompt += `## 5점 리뷰 (장점, ${positiveReviews.length}개)\n`;
-    for (const r of positiveReviews.slice(0, MAX_REVIEWS)) {
+    prompt += `## 5점 리뷰 (장점, 전체 ${positiveReviews.length}개 중 ${sampledPositive.length}개 샘플)\n`;
+    for (const r of sampledPositive) {
       prompt += `- ${r}\n`;
     }
 
-    prompt += `\n## 1~2점 리뷰 (단점, ${negativeReviews.length}개)\n`;
-    for (const r of negativeReviews.slice(0, MAX_REVIEWS)) {
+    prompt += `\n## 1~2점 리뷰 (단점, 전체 ${negativeReviews.length}개 중 ${sampledNegative.length}개 샘플)\n`;
+    for (const r of sampledNegative) {
       prompt += `- ${r}\n`;
     }
 
@@ -163,8 +184,8 @@
       const totalCost = inputCost + outputCost;
       reviewTokenInfo.className = 'token-info show';
       reviewTokenInfo.innerHTML = `
-        <span>5점 리뷰: ${positiveReviews.length}개</span>
-        <span>1~2점 리뷰: ${negativeReviews.length}개</span>
+        <span>5점: ${positiveReviews.length}개 수집 → ${sampledPositive.length}개 분석</span>
+        <span>1~2점: ${negativeReviews.length}개 수집 → ${sampledNegative.length}개 분석</span>
         <span class="cost">비용: $${totalCost.toFixed(6)} (약 ${(totalCost * KRW_RATE).toFixed(1)}원)</span>
       `;
     } catch (err) {
