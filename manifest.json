@@ -1,15 +1,39 @@
 {
   "manifest_version": 3,
   "name": "딸깍분석",
-  "version": "2.3.0",
-  "description": "페이지 분석 + 검색 기반 AI 상품 분석 익스텐션",
-  "permissions": ["activeTab", "scripting", "tabs"],
-  "content_scripts": [{
-    "js": ["coupWing.js"],
-    "matches": ["https://wing.coupang.com/*"],
-    "run_at": "document_end"
-  }],
+  "version": "2.4.0",
+  "description": "페이지 분석 + 검색 기반 AI 상품 분석 + 딸깍쇼핑 연동 익스텐션",
+  "permissions": ["activeTab", "scripting", "tabs", "windows", "proxy", "webRequest", "webRequestAuthProvider", "storage"],
+  "content_scripts": [
+    {
+      "js": ["coupWing.js"],
+      "matches": ["https://wing.coupang.com/*"],
+      "run_at": "document_end"
+    },
+    {
+      "js": ["honey_bridge.js"],
+      "matches": [
+        "http://localhost/*",
+        "http://localhost:*/*",
+        "http://127.0.0.1/*",
+        "http://127.0.0.1:*/*",
+        "https://ddalkkak-shopping.com/*",
+        "https://*.ddalkkak-shopping.com/*"
+      ],
+      "run_at": "document_start"
+    }
+  ],
   "host_permissions": ["https://*/*", "http://*/*"],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost/*",
+      "http://localhost:*/*",
+      "http://127.0.0.1/*",
+      "http://127.0.0.1:*/*",
+      "https://ddalkkak-shopping.com/*",
+      "https://*.ddalkkak-shopping.com/*"
+    ]
+  },
   "action": {
     "default_icon": {
       "16": "icons/icon16.png",
@@ -33,8 +57,10 @@
       "description": "딸깍분석 열기/닫기"
     }
   },
-  "web_accessible_resources": [{
-    "resources": ["panel.html", "config.js", "panel.js", "review.js"],
-    "matches": ["https://*/*", "http://*/*"]
-  }]
+  "web_accessible_resources": [
+    {
+      "resources": ["panel.html", "config.js", "panel.js", "review.js"],
+      "matches": ["https://*/*", "http://*/*"]
+    }
+  ]
 }

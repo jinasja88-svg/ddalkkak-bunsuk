@@ -437,3 +437,424 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 });
+
+// ===== 프록시 설정 (Decodo/SmartProxy 한국 주거 IP) =====
+const PROXY_CONFIG = {
+  enabled: false,  // Decodo 프록시 쿠팡에 차단됨 → 비활성화 (유저 본인 IP 사용)
+  host: 'gate.decodo.com',
+  port: 10001,
+  username: 'user-sp1tu2xjif-country-kr',
+  password: '9uIl0crr7e~GXGao0a'
+};
+
+// 요청마다 다른 IP 받기 위한 랜덤 세션
+function randSessionId(){
+  return Math.random().toString(36).slice(2,12);
+}
+
+function setupProxyForCoupang() {
+  if (!PROXY_CONFIG.enabled) return;
+  // PAC 스크립트: 쿠팡 도메인만 프록시 경유
+  const pacScript = `
+    function FindProxyForURL(url, host) {
+      if (host.indexOf('coupang.com') !== -1) {
+        return 'PROXY ${PROXY_CONFIG.host}:${PROXY_CONFIG.port}';
+      }
+      return 'DIRECT';
+    }
+  `;
+  chrome.proxy.settings.set({
+    value: {
+      mode: 'pac_script',
+      pacScript: { data: pacScript }
+    },
+    scope: 'regular'
+  }, () => {
+    console.log('[PROXY] 프록시 설정 완료 - 쿠팡 요청만 프록시 경유');
+  });
+}
+
+// 프록시 인증 처리 (매 요청마다 새 session ID 사용 → 다른 IP)
+chrome.webRequest.onAuthRequired.addListener(
+  (details) => {
+    if (details.isProxy) {
+      const sessionId = randSessionId();
+      return {
+        authCredentials: {
+          username: `${PROXY_CONFIG.username}-session-${sessionId}`,
+          password: PROXY_CONFIG.password
+        }
+      };
+    }
+  },
+  { urls: ['<all_urls>'] },
+  ['blocking']
+);
+
+// 프록시 비활성화 시 기존 설정 제거
+if (PROXY_CONFIG.enabled) {
+  setupProxyForCoupang();
+} else {
+  try {
+    chrome.proxy.settings.clear({ scope: 'regular' }, () => {
+      console.log('[PROXY] 프록시 비활성화 - 직접 연결');
+    });
+  } catch {}
+}
+
+// ===== 딸깍쇼핑 honey-list 페이지용 크롤링 =====
+// 외부 웹페이지에서 postMessage로 호출 → 쿠팡 상품 URL 크롤링 → 결과 반환
+
+function parseCoupangPrice(html) {
+  // 스크립트/스타일 제거
+  const clean = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
+
+  // 1. 쿠폰 적용 후 최종 가격 (prod-coupon-download-price)
+  let m = clean.match(/class="[^"]*prod-coupon-download-price[^"]*"[^>]*>[\s\S]*?([\d,]+)\s*원/);
+  if (m) return parseInt(m[1].replace(/,/g, ''));
+
+  // 2. 세일 가격 (sale-price 클래스)
+  m = clean.match(/class="[^"]*sale-price[^"]*"[^>]*>[\s\S]*?<strong[^>]*>([\d,]+)<\/strong>/);
+  if (m) return parseInt(m[1].replace(/,/g, ''));
+
+  // 3. total-price (대부분의 경우 할인 후 가격)
+  m = clean.match(/class="[^"]*total-price[^"]*"[^>]*>[\s\S]*?<strong[^>]*>([\d,]+)<\/strong>/);
+  if (m) return parseInt(m[1].replace(/,/g, ''));
+
+  // 4. price-value - 여러 개면 두번째가 할인가인 경우가 많음
+  const allPrices = [...clean.matchAll(/class="[^"]*price-value[^"]*"[^>]*>\s*([\d,]+)\s*<\/span>/g)];
+  if (allPrices.length >= 2) {
+    // 두번째가 할인가 (첫번째는 원가)
+    return parseInt(allPrices[1][1].replace(/,/g, ''));
+  }
+  if (allPrices.length === 1) return parseInt(allPrices[0][1].replace(/,/g, ''));
+
+  // 5. JSON salesPrice
+  m = clean.match(/"salesPrice"\s*:\s*\{?\s*"?amount"?\s*:?\s*"?([\d]+)"?/);
+  if (m) return parseInt(m[1]);
+
+  // 6. 마지막 수단: "X원" 중 제일 작은 숫자 (할인가 가능성)
+  const anyPrices = [...clean.matchAll(/>([\d,]{3,})\s*원</g)].map(x => parseInt(x[1].replace(/,/g, ''))).filter(n => n > 100 && n < 100000000);
+  if (anyPrices.length >= 2) return Math.min(...anyPrices);
+  if (anyPrices.length === 1) return anyPrices[0];
+
+  return 0;
+}
+
+function parseCoupangPurchase(html) {
+  // 1. HTML 태그 사이 숫자 처리: <b>500</b>명 이상
+  const clean = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
+  // 태그 제거한 텍스트로 매칭
+  const text = clean.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const m = text.match(/([\d,]+)\s*명\s*이상.{0,30}?구매했어요/);
+  if (m) return parseInt(m[1].replace(/,/g, ''));
+  return null; // 해당 정보 없음
+}
+
+// 탭에서 DOM 직접 파싱하는 함수 (문자열로 주입됨)
+function extractCoupangData() {
+  // 항상 기본값 설정 (에러 발생해도 필드 누락 방지)
+  const result = {
+    url: '',
+    title: '',
+    bodyLen: 0,
+    price: 0,
+    purchase: undefined,
+    blocked: false,
+    _timestamp: Date.now()
+  };
+  try {
+    result.url = location.href || '';
+    result.title = document.title || '';
+    try { result.bodyLen = (document.body && document.body.innerText) ? document.body.innerText.length : 0; } catch { result.bodyLen = 0; }
+    result.readyState = document.readyState;
+
+    // 차단 체크
+    if (document.title && document.title.includes('Access Denied')) {
+      result.blocked = true;
+      return result;
+    }
+
+    // 0. final-price-amount (데스크톱)
+    let el = document.querySelector('[class*="final-price-amount"]');
+    if (el) {
+      const n = parseInt(el.textContent.replace(/[^\d]/g, ''));
+      if (n > 0) result.price = n;
+    }
+    // 0-1. 모바일: prod-sale-price, price-amount
+    if (!result.price) {
+      el = document.querySelector('.prod-sale-price') ||
+           document.querySelector('[class*="salePrice"]') ||
+           document.querySelector('[class*="SalePrice"]');
+      if (el) {
+        const n = parseInt(el.textContent.replace(/[^\d]/g, ''));
+        if (n > 0) result.price = n;
+      }
+    }
+    // 1. total-price strong
+    if (!result.price) {
+      el = document.querySelector('.total-price strong') ||
+           document.querySelector('[class*="sale-price"] strong');
+      if (el) {
+        const n = parseInt(el.textContent.replace(/[^\d]/g, ''));
+        if (n > 0) result.price = n;
+      }
+    }
+    // 2. price-amount (not original)
+    if (!result.price) {
+      const priceEls = document.querySelectorAll('.price-amount, [class*="price-amount"]');
+      const prices = [];
+      priceEls.forEach(e => {
+        const cls = e.className || '';
+        if (cls.includes('original-price')) return; // 원가 제외
+        const n = parseInt(e.textContent.replace(/[^\d]/g, ''));
+        if (n > 100) prices.push(n);
+      });
+      if (prices.length) result.price = Math.min(...prices);
+    }
+    // 3. 원가 (비교용)
+    const orig = document.querySelector('.original-price-amount, [class*="original-price"]');
+    if (orig) {
+      const n = parseInt(orig.textContent.replace(/[^\d]/g, ''));
+      if (n > 0) result.originalPrice = n;
+    }
+    // 4. price-value (여러개면 두번째가 할인가)
+    if (!result.price) {
+      const pvEls = [...document.querySelectorAll('[class*="price-value"]')]
+        .filter(e => /\d{3,}/.test(e.textContent));
+      if (pvEls.length >= 2) {
+        const n = parseInt(pvEls[1].textContent.replace(/[^\d]/g, ''));
+        if (n > 0) result.price = n;
+      } else if (pvEls.length === 1) {
+        const n = parseInt(pvEls[0].textContent.replace(/[^\d]/g, ''));
+        if (n > 0) result.price = n;
+      }
+    }
+    // 5. strong 태그 중 가격처럼 보이는 것
+    if (!result.price) {
+      const strongs = [...document.querySelectorAll('strong')]
+        .filter(e => /^\s*[\d,]{3,}\s*$/.test(e.textContent));
+      const prices = strongs.map(e => parseInt(e.textContent.replace(/[^\d]/g, ''))).filter(n => n > 100 && n < 100000000);
+      if (prices.length) result.price = Math.min(...prices);
+    }
+    // 6. 마지막 수단: 페이지 텍스트에서 "XX,XXX원"
+    if (!result.price) {
+      const text = document.body?.innerText || '';
+      const prices = [...text.matchAll(/([\d,]{3,})\s*원/g)]
+        .map(m => parseInt(m[1].replace(/,/g, '')))
+        .filter(n => n > 100 && n < 100000000);
+      if (prices.length) result.price = Math.min(...prices);
+    }
+  } catch(e) { result.priceError = e.message; }
+
+  // 구매수
+  try {
+    const text = document.body.innerText;
+    const m = text.match(/([\d,]+)\s*명\s*이상.{0,30}?구매했어요/);
+    if (m) result.purchase = parseInt(m[1].replace(/,/g, ''));
+  } catch(e) { result.purchaseError = e.message; }
+
+  // 차단 확인
+  if (document.title && document.title.includes('Access Denied')) {
+    result.blocked = true;
+  }
+
+  return result;
+}
+
+// 숨겨진 크롤링용 윈도우 (최소화 상태로 유지)
+let crawlWindowId = null;
+
+async function getCrawlWindow() {
+  // 기존 창이 살아있는지 확인
+  if (crawlWindowId !== null) {
+    try {
+      await chrome.windows.get(crawlWindowId);
+      return crawlWindowId;
+    } catch {
+      crawlWindowId = null;
+    }
+  }
+  // 새 창 생성 (작은 크기 + 화면 밖 위치 → 렌더링은 되지만 안 보임)
+  const win = await chrome.windows.create({
+    url: 'about:blank',
+    type: 'popup',
+    focused: false,
+    width: 500,
+    height: 400,
+    top: 0,
+    left: 0
+  });
+  crawlWindowId = win.id;
+  return crawlWindowId;
+}
+
+function toMobileUrl(url) {
+  // www.coupang.com/vp/products → m.coupang.com/vm/products
+  return url
+    .replace('://www.coupang.com/vp/', '://m.coupang.com/vm/')
+    .replace('://coupang.com/vp/', '://m.coupang.com/vm/');
+}
+
+async function crawlSingleUrlInWindow(url, mode) {
+  return new Promise(async (resolve) => {
+    let tab = null;
+    let settled = false;
+    const targetUrl = toMobileUrl(url);
+
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      try { chrome.tabs.onUpdated.removeListener(listener); } catch {}
+      if (tab) { try { chrome.tabs.remove(tab.id); } catch {} }
+      resolve(result);
+    };
+
+    // 40초 전체 타임아웃: 끝나기 직전에 lastData 있으면 그걸로 판정
+    let lastData = null;
+    const timeoutId = setTimeout(() => {
+      if (lastData && lastData.bodyLen > 1000) {
+        decideResult(lastData);
+      } else {
+        finish({ url, ok: false, error: 'timeout', debug: lastData });
+      }
+    }, 40000);
+
+    const decideResult = (data) => {
+      console.log('[CRAWL]', url, 'mode:', mode, 'data:', data);
+      if (!data) { finish({ url, ok: false, error: 'no data' }); return; }
+      if (data.blocked) { finish({ url, ok: false, error: 'blocked (Access Denied)' }); return; }
+      if (mode === 'price') {
+        if (data.price > 0) finish({ url, ok: true, p: data.price, originalPrice: data.originalPrice });
+        else if ((data.bodyLen || 0) < 1000) finish({ url, ok: false, error: '페이지 로드 실패/차단 (bodyLen: ' + data.bodyLen + ')', debug: data });
+        else finish({ url, ok: false, error: '가격 요소 못 찾음 (페이지는 로드됨)', debug: data });
+      } else if (mode === 'purchase') {
+        if ((data.bodyLen || 0) > 1000 && !data.blocked) finish({ url, ok: true, bc: data.purchase ?? 0 });
+        else finish({ url, ok: false, error: '페이지 로드 실패 (bodyLen: ' + data.bodyLen + ')', debug: data });
+      } else {
+        finish({ url, ok: false, error: 'unknown mode' });
+      }
+    };
+
+    const runExtractLoop = async () => {
+      for (let attempt = 0; attempt < 30 && !settled; attempt++) {
+        await new Promise(r => setTimeout(r, 500));
+        if (settled) return;
+        try {
+          const results = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: extractCoupangData,
+            world: 'MAIN'
+          });
+          const r = results?.[0];
+          if (!r || !r.result) continue;
+          const d = r.result;
+          lastData = d;
+          if (d.blocked) { decideResult(d); return; }
+          if (d.bodyLen > 3000 && d.title && !d.title.includes('loading')) {
+            if (mode === 'price' && d.price > 0) { decideResult(d); return; }
+            if (mode === 'purchase' && d.purchase !== undefined) { decideResult(d); return; }
+            if (attempt >= 14) { decideResult(d); return; }  // 7초 넘게 기다려도 못찾으면 포기
+          }
+        } catch (e) {
+          if (e.message && e.message.includes('No tab')) { finish({ url, ok: false, error: 'tab closed' }); return; }
+          // frame 아직 준비 안 됨 — 계속 재시도
+        }
+      }
+      // loop 끝남
+      if (!settled) decideResult(lastData);
+    };
+
+    let loopStarted = false;
+    const startLoop = () => {
+      if (loopStarted || settled) return;
+      loopStarted = true;
+      runExtractLoop();
+    };
+
+    const listener = (tabId, info) => {
+      if (!tab || tabId !== tab.id) return;
+      // complete 못 와도 loading 상태에서 이미 DOM 접근 가능한 경우 있음
+      if (info.status === 'complete' || info.status === 'loading') {
+        startLoop();
+      }
+    };
+
+    try {
+      const winId = await getCrawlWindow();
+      chrome.tabs.onUpdated.addListener(listener);
+      tab = await chrome.tabs.create({ windowId: winId, url: targetUrl, active: false });
+      // 리스너 등록/탭 생성 타이밍 race 대비: 2.5초 후 상태 무관하게 강제 시작
+      setTimeout(() => {
+        if (!loopStarted && !settled && tab) startLoop();
+      }, 2500);
+    } catch (e) {
+      finish({ url, ok: false, error: e.message });
+    }
+  });
+}
+
+// 큐 + 프록시 사용 시 동시성 3개 (각각 다른 IP 할당되므로 차단 안 됨)
+let crawlQueue = Promise.resolve();
+const CONCURRENCY = PROXY_CONFIG.enabled ? 3 : 1;
+
+async function crawlCoupangItems(urls, mode) {
+  const task = async () => {
+    const results = new Array(urls.length);
+    for (let i = 0; i < urls.length; i += CONCURRENCY) {
+      const batch = urls.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.all(
+        batch.map(u => crawlSingleUrlInWindow(u, mode))
+      );
+      batchResults.forEach((r, j) => { results[i + j] = r; });
+      if (i + CONCURRENCY < urls.length) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+    return results;
+  };
+  const p = crawlQueue.then(task);
+  crawlQueue = p.catch(() => {});
+  return p;
+}
+
+// 내부 메시지 (content script bridge용)
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'DDALKKAK_PING') {
+    sendResponse({ success: true, version: chrome.runtime.getManifest().version });
+    return false;
+  }
+  if (request.action === 'DDALKKAK_CRAWL_ITEMS') {
+    (async () => {
+      try {
+        const results = await crawlCoupangItems(request.urls || [], request.mode || 'price');
+        sendResponse({ success: true, results });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+});
+
+// 외부 웹페이지에서 직접 메시지 (externally_connectable)
+if (chrome.runtime.onMessageExternal) {
+  chrome.runtime.onMessageExternal.addListener((request, sender, sendResponse) => {
+    if (request.action === 'DDALKKAK_PING') {
+      sendResponse({ success: true, version: chrome.runtime.getManifest().version });
+      return false;
+    }
+    if (request.action === 'DDALKKAK_CRAWL_ITEMS') {
+      (async () => {
+        try {
+          const results = await crawlCoupangItems(request.urls || [], request.mode || 'price');
+          sendResponse({ success: true, results });
+        } catch (err) {
+          sendResponse({ success: false, error: err.message });
+        }
+      })();
+      return true;
+    }
+  });
+}
