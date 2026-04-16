@@ -9,6 +9,12 @@
   marker.dataset.version = chrome.runtime.getManifest().version;
   (document.documentElement || document.body || document).appendChild(marker);
 
+  // background → content script 브로드캐스트를 window.postMessage로 페이지에 전달
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (!msg || !msg.type || !msg.type.startsWith('DDALKKAK_')) return;
+    try { window.postMessage(msg, '*'); } catch {}
+  });
+
   // 웹페이지 → content script
   window.addEventListener('message', (event) => {
     if (event.source !== window) return;
@@ -35,6 +41,21 @@
         (resp) => {
           window.postMessage({
             type: 'DDALKKAK_CRAWL_RESPONSE',
+            requestId,
+            ...(resp || { success: false, error: 'No response' })
+          }, '*');
+        }
+      );
+      return;
+    }
+
+    if (type === 'DDALKKAK_WING_CATEGORY_CRAWL_REQUEST') {
+      const { categoryCode, categoryPath } = payload || {};
+      chrome.runtime.sendMessage(
+        { action: 'DDALKKAK_WING_CATEGORY_CRAWL', categoryCode, categoryPath },
+        (resp) => {
+          window.postMessage({
+            type: 'DDALKKAK_WING_CATEGORY_CRAWL_RESPONSE',
             requestId,
             ...(resp || { success: false, error: 'No response' })
           }, '*');

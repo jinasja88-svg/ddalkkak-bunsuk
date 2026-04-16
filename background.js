@@ -824,6 +824,104 @@ async function crawlCoupangItems(urls, mode) {
   return p;
 }
 
+// ===== Wing 카테고리 크롤: wing 탭 찾기/열기 + coupWing.js에 메시지 =====
+async function wingCategoryCrawl(categoryCode, categoryPath) {
+  console.log('[WING_CAT] 시작 — code:', categoryCode, 'path:', categoryPath);
+  // 기존 wing 탭 재사용 (activeTab 미고려, 그냥 첫 번째)
+  let wingTabs = await chrome.tabs.query({ url: 'https://wing.coupang.com/*' });
+  let wingTab = wingTabs && wingTabs[0];
+  let openedByUs = false;
+  console.log('[WING_CAT] 기존 wing 탭:', wingTab ? wingTab.url : '없음');
+
+  if (!wingTab) {
+    wingTab = await chrome.tabs.create({ url: 'https://wing.coupang.com/', active: true });
+    openedByUs = true;
+    // complete 이벤트 대기 (최대 2분 = 로그인 시간 포함)
+    await new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        chrome.tabs.onUpdated.removeListener(listener);
+        reject(new Error('wing tab load timeout'));
+      }, 120000);
+      const listener = (id, info, tab) => {
+        if (id !== wingTab.id) return;
+        // 로그인 리다이렉트 후 최종 wing.coupang.com 페이지 complete 될 때까지
+        if (info.status === 'complete' && tab.url && tab.url.startsWith('https://wing.coupang.com/') && !tab.url.includes('/login') && !tab.url.includes('xauth')) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          chrome.tabs.onUpdated.removeListener(listener);
+          // 추가 안정화 딜레이 (content script 주입 대기)
+          setTimeout(resolve, 1500);
+        }
+      };
+      chrome.tabs.onUpdated.addListener(listener);
+    });
+  }
+
+  // content script가 주입되어 있지 않으면 메시지 안 감 (익스텐션 리로드 후 기존 탭 문제).
+  // sendMessage 1차 시도 → 실패 시 executeScript로 주입 → 재시도
+  const trySend = () => new Promise((resolve) => {
+    chrome.tabs.sendMessage(
+      wingTab.id,
+      { type: 'wingCategoryCrawl', categoryCode, categoryPath },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          resolve({ _err: chrome.runtime.lastError.message });
+          return;
+        }
+        resolve({ _resp: response });
+      }
+    );
+  });
+
+  console.log('[WING_CAT] content script에 1차 송신 — tabId:', wingTab.id);
+  let r = await trySend();
+
+  if (r._err) {
+    console.warn('[WING_CAT] 1차 실패, coupWing.js 주입 시도:', r._err);
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: wingTab.id },
+        files: ['coupWing.js']
+      });
+      console.log('[WING_CAT] coupWing.js 주입 성공');
+    } catch (injErr) {
+      console.error('[WING_CAT] 주입 실패:', injErr);
+      return { success: false, error: 'coupWing.js 주입 실패: ' + injErr.message, _lastError: r._err };
+    }
+    // 주입 후 리스너 등록 대기
+    await new Promise((res) => setTimeout(res, 500));
+    console.log('[WING_CAT] 2차 송신');
+    r = await trySend();
+    if (r._err) {
+      return { success: false, error: 'Wing 탭 content script 주입 후에도 응답 없음', _lastError: r._err };
+    }
+  }
+
+  console.log('[WING_CAT] content script 응답:', r._resp);
+  return r._resp || { success: false, error: 'content script가 sendResponse를 호출하지 않음' };
+}
+
+// Wing 카테고리 크롤 progress 중계 (coupWing.js → background → honey_bridge 탭들)
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'DDALKKAK_WING_CAT_PROGRESS') {
+    // honey_bridge가 주입된 탭들에 전파 (localhost/127.0.0.1/ddalkkak-shopping.com)
+    chrome.tabs.query({ url: [
+      'http://localhost/*', 'http://localhost:*/*',
+      'http://127.0.0.1/*', 'http://127.0.0.1:*/*',
+      'https://ddalkkak-shopping.com/*', 'https://*.ddalkkak-shopping.com/*'
+    ]}, (tabs) => {
+      for (const tab of tabs || []) {
+        try { chrome.tabs.sendMessage(tab.id, { type: 'DDALKKAK_WING_CAT_PROGRESS', ...request }); } catch {}
+      }
+    });
+    return false;
+  }
+});
+
 // 내부 메시지 (content script bridge용)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'DDALKKAK_PING') {
@@ -835,6 +933,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       try {
         const results = await crawlCoupangItems(request.urls || [], request.mode || 'price');
         sendResponse({ success: true, results });
+      } catch (err) {
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
+  if (request.action === 'DDALKKAK_WING_CATEGORY_CRAWL') {
+    (async () => {
+      try {
+        const res = await wingCategoryCrawl(request.categoryCode, request.categoryPath);
+        sendResponse(res);
       } catch (err) {
         sendResponse({ success: false, error: err.message });
       }
@@ -855,6 +964,17 @@ if (chrome.runtime.onMessageExternal) {
         try {
           const results = await crawlCoupangItems(request.urls || [], request.mode || 'price');
           sendResponse({ success: true, results });
+        } catch (err) {
+          sendResponse({ success: false, error: err.message });
+        }
+      })();
+      return true;
+    }
+    if (request.action === 'DDALKKAK_WING_CATEGORY_CRAWL') {
+      (async () => {
+        try {
+          const res = await wingCategoryCrawl(request.categoryCode, request.categoryPath);
+          sendResponse(res);
         } catch (err) {
           sendResponse({ success: false, error: err.message });
         }
