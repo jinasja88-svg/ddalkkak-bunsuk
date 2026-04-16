@@ -730,7 +730,12 @@ async function crawlSingleUrlInWindow(url, mode) {
         else if ((data.bodyLen || 0) < 1000) finish({ url, ok: false, error: '페이지 로드 실패/차단 (bodyLen: ' + data.bodyLen + ')', debug: data });
         else finish({ url, ok: false, error: '가격 요소 못 찾음 (페이지는 로드됨)', debug: data });
       } else if (mode === 'purchase') {
-        if ((data.bodyLen || 0) > 1000 && !data.blocked) finish({ url, ok: true, bc: data.purchase ?? 0 });
+        if ((data.bodyLen || 0) > 1000 && !data.blocked) {
+          // 구매수 + 가격 둘 다 반환 (가격은 있으면 포함, 없어도 ok)
+          const result = { url, ok: true, bc: data.purchase ?? 0 };
+          if (data.price > 0) result.p = data.price;
+          finish(result);
+        }
         else finish({ url, ok: false, error: '페이지 로드 실패 (bodyLen: ' + data.bodyLen + ')', debug: data });
       } else {
         finish({ url, ok: false, error: 'unknown mode' });
